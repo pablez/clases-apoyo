@@ -1,5 +1,7 @@
 import { getAlumnos, getAsistencias, updateAsistencia } from '../../services/api.js';
 
+export const prerender = false;
+
 export async function GET({ params, url }) {
   const endpoint = params.endpoint;
   

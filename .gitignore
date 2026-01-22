@@ -2,6 +2,7 @@ node_modules/
 .env
 .env.local
 dist/
+.netlify/
 .DS_Store
 .vscode/
 educacion-llave.json
