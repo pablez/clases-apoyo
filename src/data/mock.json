@@ -1,11 +1,98 @@
 {
   "alumnos": [
-    { "id": "1", "nombre": "Juan Pérez", "clases_compradas": 10 },
-    { "id": "2", "nombre": "María López", "clases_compradas": 8 }
+    {
+      "id": "1",
+      "nombre": "Juan Pérez",
+      "edad": 16,
+      "curso": "4to Secundaria",
+      "telefono_padre": "+51 987654321",
+      "materias": ["Matemáticas", "Física"],
+      "clases_compradas": 10
+    },
+    {
+      "id": "2",
+      "nombre": "María López",
+      "edad": 15,
+      "curso": "3ro Secundaria",
+      "telefono_padre": "+51 912345678",
+      "materias": ["Química", "Matemáticas"],
+      "clases_compradas": 8
+    }
   ],
   "asistencias": [
-    { "id": "101", "alumnoId": "1", "fecha": "2026-01-15", "estado": "Presente" },
-    { "id": "102", "alumnoId": "1", "fecha": "2026-01-20", "estado": "Falta" },
-    { "id": "103", "alumnoId": "2", "fecha": "2026-01-18", "estado": "Presente" }
+    {
+      "id": "101",
+      "alumnoId": "1",
+      "fecha": "2026-01-15",
+      "hora": "16:00",
+      "estado": "Presente",
+      "observaciones": "Clase normal, buen rendimiento"
+    },
+    {
+      "id": "102",
+      "alumnoId": "1",
+      "fecha": "2026-01-20",
+      "hora": "16:00",
+      "estado": "Falta",
+      "observaciones": "Avisó con anticipación"
+    },
+    {
+      "id": "103",
+      "alumnoId": "2",
+      "fecha": "2026-01-18",
+      "hora": "17:30",
+      "estado": "Presente",
+      "observaciones": "Repasó ejercicios de química"
+    },
+    {
+      "id": "104",
+      "alumnoId": "1",
+      "fecha": "2026-01-22",
+      "hora": "16:00",
+      "estado": "Modificado",
+      "observaciones": "Cambió horario por emergencia familiar"
+    },
+    {
+      "id": "105",
+      "alumnoId": "2",
+      "fecha": "2026-01-25",
+      "hora": "17:30",
+      "estado": "Pendiente",
+      "observaciones": "Clase programada, aún no realizada"
+    }
+  ],
+  "materiales": [
+    {
+      "id": "1",
+      "materia": "Matemáticas",
+      "titulo": "Álgebra Básica - Ecuaciones Lineales",
+      "descripcion": "Guía completa de ecuaciones lineales con ejemplos y ejercicios resueltos",
+      "url_recurso": "https://example.com/algebra-lineal.pdf",
+      "imagen_url": "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400"
+    },
+    {
+      "id": "2",
+      "materia": "Física",
+      "titulo": "Cinemática - Movimiento Rectilíneo",
+      "descripcion": "Conceptos fundamentales de velocidad, aceleración y MRU/MRUV",
+      "url_recurso": "https://example.com/cinematica.pdf",
+      "imagen_url": "https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?w=400"
+    },
+    {
+      "id": "3",
+      "materia": "Química",
+      "titulo": "Tabla Periódica y Propiedades",
+      "descripcion": "Estudio de elementos químicos y sus propiedades periódicas",
+      "url_recurso": "https://example.com/tabla-periodica.pdf",
+      "imagen_url": "https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?w=400"
+    },
+    {
+      "id": "4",
+      "materia": "Programación",
+      "titulo": "Introducción a Python",
+      "descripcion": "Fundamentos de programación con Python para principiantes",
+      "url_recurso": "https://example.com/python-intro.pdf",
+      "imagen_url": "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=400"
+    }
   ]
 }

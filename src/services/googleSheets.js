@@ -1,26 +1,56 @@
 import { google } from 'googleapis';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || '';
 const GOOGLE_SERVICE_ACCOUNT_KEY_PATH = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || '';
+const GOOGLE_SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '';
 
 let sheetsClient = null;
 
 async function getGoogleSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
-  if (!GOOGLE_SHEET_ID || !GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
-    throw new Error('Google Sheets no configurado. Define GOOGLE_SHEET_ID y GOOGLE_SERVICE_ACCOUNT_KEY_PATH');
+  if (!GOOGLE_SHEET_ID) {
+    throw new Error('GOOGLE_SHEET_ID no está configurado');
   }
 
-  const keyPath = path.isAbsolute(GOOGLE_SERVICE_ACCOUNT_KEY_PATH) 
-    ? GOOGLE_SERVICE_ACCOUNT_KEY_PATH 
-    : path.resolve(process.cwd(), GOOGLE_SERVICE_ACCOUNT_KEY_PATH);
+  let auth;
 
-  const auth = new google.auth.GoogleAuth({
-    keyFile: keyPath,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
+  // OPCIÓN 1: Credenciales desde variable de entorno (PRODUCCIÓN - Netlify)
+  if (GOOGLE_SERVICE_ACCOUNT_JSON) {
+    console.log('🔑 Usando credenciales desde variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON');
+    try {
+      const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
+      auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+    } catch (error) {
+      throw new Error(`Error al parsear GOOGLE_SERVICE_ACCOUNT_JSON: ${error.message}`);
+    }
+  }
+  // OPCIÓN 2: Credenciales desde archivo (DESARROLLO - local)
+  else if (GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
+    console.log('🔑 Usando credenciales desde archivo:', GOOGLE_SERVICE_ACCOUNT_KEY_PATH);
+    const keyPath = path.isAbsolute(GOOGLE_SERVICE_ACCOUNT_KEY_PATH) 
+      ? GOOGLE_SERVICE_ACCOUNT_KEY_PATH 
+      : path.resolve(process.cwd(), GOOGLE_SERVICE_ACCOUNT_KEY_PATH);
+    
+    if (!fs.existsSync(keyPath)) {
+      throw new Error(`Archivo de credenciales no encontrado: ${keyPath}`);
+    }
+
+    auth = new google.auth.GoogleAuth({
+      keyFile: keyPath,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+  } else {
+    throw new Error(
+      'No hay credenciales configuradas. Define GOOGLE_SERVICE_ACCOUNT_JSON (producción) o GOOGLE_SERVICE_ACCOUNT_KEY_PATH (desarrollo)'
+    );
+  }
 
   sheetsClient = google.sheets({ version: 'v4', auth });
   return sheetsClient;
@@ -75,10 +105,21 @@ export function rowsToObjects(rows) {
 /**
  * Ejemplo de uso:
  * 
- * // Leer alumnos de una hoja llamada "Alumnos" con columnas: id, nombre, clases_compradas
- * const rows = await readSheetRange('Alumnos!A1:C100');
+ * // HOJA "Alumnos" (A1:H100)
+ * // Columnas: id_alumno, nombre, edad, curso, telefono_padre, materias, clases_compradas, horas
+ * const rows = await readSheetRange('Alumnos!A1:H100');
  * const alumnos = rowsToObjects(rows);
  * 
- * // Actualizar un estado de asistencia en la fila 5, columna D
- * await updateSheetRange('Asistencias!D5', [['Presente']]);
+ * // HOJA "Asistencias" (A1:F100)
+ * // Columnas: id_asistencia, id_alumno, fecha, hora, estado, observaciones
+ * const rowsAsis = await readSheetRange('Asistencias!A1:F100');
+ * const asistencias = rowsToObjects(rowsAsis);
+ * 
+ * // HOJA "Materiales" (A1:F100)
+ * // Columnas: id_material, materia, titulo, descripcion, url_recurso, imagen_url
+ * const rowsMat = await readSheetRange('Materiales!A1:F100');
+ * const materiales = rowsToObjects(rowsMat);
+ * 
+ * // Actualizar un estado de asistencia en la fila 5, columna E
+ * await updateSheetRange('Asistencias!E5', [['Presente']]);
  */

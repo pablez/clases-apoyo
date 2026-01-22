@@ -1,6 +1,8 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import AttendanceManager from '../components/AttendanceManager.jsx';
+import AlumnosManager from '../components/AlumnosManager.jsx';
+import MaterialesManager from '../components/MaterialesManager.jsx';
 
 const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
 ---
@@ -9,26 +11,74 @@ const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
   <div id="auth-container" class="max-w-md mx-auto">
     <div class="bg-white rounded-lg shadow p-6">
       <h1 class="text-2xl font-bold mb-4">Acceso Administrativo</h1>
-      <p class="text-gray-600 mb-4">Ingresa la contraseña para acceder al panel de asistencia.</p>
-      <input
-        type="password"
-        id="password-input"
-        placeholder="Contraseña"
-        class="w-full px-4 py-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-      <button
-        id="login-btn"
-        class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-      >
-        Acceder
-      </button>
+      <p class="text-gray-600 mb-4">Ingresa la contraseña para acceder al panel de gestión.</p>
+      <form id="login-form" onsubmit="return false;">
+        <input
+          type="text"
+          name="username"
+          autocomplete="username"
+          style="display:none;"
+          value="admin"
+        />
+        <input
+          type="password"
+          id="password-input"
+          name="password"
+          placeholder="Contraseña"
+          class="w-full px-4 py-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          autocomplete="current-password"
+        />
+        <button
+          id="login-btn"
+          type="submit"
+          class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+        >
+          Acceder
+        </button>
+      </form>
       <p id="error-msg" class="text-red-600 text-sm mt-2 hidden">Contraseña incorrecta</p>
     </div>
   </div>
 
   <div id="admin-panel" class="hidden">
-    <h1 class="text-3xl font-bold mb-6">Panel de Asistencia</h1>
-    <AttendanceManager client:load apiBaseUrl="/api" />
+    <h1 class="text-3xl font-bold mb-6">Panel de Gestión</h1>
+    
+    <!-- Pestañas -->
+    <div class="mb-6 border-b">
+      <nav class="flex gap-4">
+        <button 
+          class="tab-button px-4 py-2 font-medium border-b-2 border-blue-600 text-blue-600"
+          data-tab="asistencia"
+        >
+          📊 Asistencia
+        </button>
+        <button 
+          class="tab-button px-4 py-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900"
+          data-tab="alumnos"
+        >
+          👥 Alumnos
+        </button>
+        <button 
+          class="tab-button px-4 py-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900"
+          data-tab="materiales"
+        >
+          📚 Materiales
+        </button>
+      </nav>
+    </div>
+
+    <!-- Contenido de pestañas -->
+    <div id="tab-asistencia" class="tab-content">
+      <AttendanceManager client:load apiBaseUrl="/api" />
+    </div>
+
+    <div id="tab-alumnos" class="tab-content hidden">
+      <AlumnosManager client:load apiBaseUrl="/api" />
+    </div>
+
+    <div id="tab-materiales" class="tab-content hidden">
+      <MaterialesManager client:load apiBaseUrl="/api" />
+    </div>
   </div>
 
   <script define:vars={{ ADMIN_PASSWORD }}>
@@ -61,6 +111,36 @@ const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
       if (e.key === 'Enter') {
         loginBtn.click();
       }
+    });
+
+    // Tabs functionality
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const tabName = button.dataset.tab;
+        
+        // Update button styles
+        tabButtons.forEach(btn => {
+          if (btn === button) {
+            btn.classList.add('border-blue-600', 'text-blue-600');
+            btn.classList.remove('border-transparent', 'text-gray-600');
+          } else {
+            btn.classList.remove('border-blue-600', 'text-blue-600');
+            btn.classList.add('border-transparent', 'text-gray-600');
+          }
+        });
+
+        // Show/hide content
+        tabContents.forEach(content => {
+          if (content.id === `tab-${tabName}`) {
+            content.classList.remove('hidden');
+          } else {
+            content.classList.add('hidden');
+          }
+        });
+      });
     });
   </script>
 </Layout>

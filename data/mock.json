@@ -1,0 +1,17 @@
+{
+  "alumnos": [
+    {
+      "id": 1,
+      "nombre": "Pablo",
+      "edad": "15",
+      "curso": "4to de secundaria",
+      "telefono_padre": "78451296",
+      "materias": [
+        "Matematicas"
+      ],
+      "clases_compradas": "12"
+    }
+  ],
+  "asistencias": [],
+  "materiales": []
+}
