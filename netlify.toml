@@ -1,0 +1,36 @@
+# Configuración de Netlify para Astro
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Configuración de headers para mejor rendimiento
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Cache para assets estáticos
+[[headers]]
+  for = "/_astro/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Variables de entorno (ejemplo - configurar en Netlify UI)
+# ADMIN_PASSWORD = "tu_contraseña_segura"
+# USE_GOOGLE_SHEETS = "true"
+# GOOGLE_SHEET_ID = "tu-spreadsheet-id"
+# GOOGLE_SERVICE_ACCOUNT_KEY_PATH = "./educacion-llave.json"
+# SHEETY_BASE_URL = "https://api.sheety.co/tu-usuario/tu-proyecto"
+# SHEETY_TOKEN = "tu_token"
+
+# Redirecciones (opcional)
+# [[redirects]]
+#   from = "/old-path"
+#   to = "/new-path"
+#   status = 301
+
+# Funciones serverless de Astro (si necesitas SSR en el futuro)
+[functions]
+  node_bundler = "esbuild"

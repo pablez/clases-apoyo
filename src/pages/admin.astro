@@ -1,0 +1,66 @@
+---
+import Layout from '../layouts/Layout.astro';
+import AttendanceManager from '../components/AttendanceManager.jsx';
+
+const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
+---
+
+<Layout title="Panel de Administración">
+  <div id="auth-container" class="max-w-md mx-auto">
+    <div class="bg-white rounded-lg shadow p-6">
+      <h1 class="text-2xl font-bold mb-4">Acceso Administrativo</h1>
+      <p class="text-gray-600 mb-4">Ingresa la contraseña para acceder al panel de asistencia.</p>
+      <input
+        type="password"
+        id="password-input"
+        placeholder="Contraseña"
+        class="w-full px-4 py-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <button
+        id="login-btn"
+        class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+      >
+        Acceder
+      </button>
+      <p id="error-msg" class="text-red-600 text-sm mt-2 hidden">Contraseña incorrecta</p>
+    </div>
+  </div>
+
+  <div id="admin-panel" class="hidden">
+    <h1 class="text-3xl font-bold mb-6">Panel de Asistencia</h1>
+    <AttendanceManager client:load apiBaseUrl="/api" />
+  </div>
+
+  <script define:vars={{ ADMIN_PASSWORD }}>
+    const authContainer = document.getElementById('auth-container');
+    const adminPanel = document.getElementById('admin-panel');
+    const passwordInput = document.getElementById('password-input');
+    const loginBtn = document.getElementById('login-btn');
+    const errorMsg = document.getElementById('error-msg');
+
+    // Check if already authenticated
+    if (sessionStorage.getItem('admin_auth') === 'true') {
+      authContainer.classList.add('hidden');
+      adminPanel.classList.remove('hidden');
+    }
+
+    loginBtn.addEventListener('click', () => {
+      const password = passwordInput.value;
+      if (password === ADMIN_PASSWORD) {
+        sessionStorage.setItem('admin_auth', 'true');
+        authContainer.classList.add('hidden');
+        adminPanel.classList.remove('hidden');
+        errorMsg.classList.add('hidden');
+      } else {
+        errorMsg.classList.remove('hidden');
+        passwordInput.value = '';
+      }
+    });
+
+    passwordInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        loginBtn.click();
+      }
+    });
+  </script>
+</Layout>
