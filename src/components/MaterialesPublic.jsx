@@ -7,32 +7,72 @@ export default function MaterialesPublic({ apiBaseUrl = '/api' }) {
   const [error, setError] = useState(null);
   const [selectedMateria, setSelectedMateria] = useState('Todas');
   const [retryCount, setRetryCount] = useState(0);
+  const [diagnostics, setDiagnostics] = useState(null);
 
   const materias = ['Todas', 'Matemáticas', 'Física', 'Química', 'Programación'];
 
   useEffect(() => {
+    checkHealth();
     loadMateriales();
   }, []);
+
+  async function checkHealth() {
+    try {
+      const res = await fetch(`${apiBaseUrl}/health`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      const data = await res.json();
+      console.log('🏥 Health check:', data);
+      setDiagnostics(data);
+    } catch (err) {
+      console.error('❌ Health check failed:', err);
+    }
+  }
 
   async function loadMateriales() {
     setLoading(true);
     setError(null);
     
     try {
-      console.log('🔄 Cargando materiales...');
-      const res = await fetch(`${apiBaseUrl}/materiales`);
+      console.log('🔄 Cargando materiales desde:', `${apiBaseUrl}/materiales`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
+      
+      const res = await fetch(`${apiBaseUrl}/materiales`, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('📡 Respuesta recibida:', res.status, res.statusText);
       
       if (!res.ok) {
-        throw new Error(`Error ${res.status}: ${res.statusText}`);
+        const errorData = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(`Error ${res.status}: ${errorData.error || res.statusText}`);
       }
       
       const data = await res.json();
       console.log('✅ Materiales cargados:', data.length);
+      console.log('📦 Datos:', data);
+      
       setMateriales(data);
       setRetryCount(0);
     } catch (err) {
       console.error('❌ Error al cargar materiales:', err);
-      setError(err.message);
+      
+      let errorMessage = err.message;
+      
+      if (err.name === 'AbortError') {
+        errorMessage = 'La petición tardó demasiado. Verifica tu conexión a internet.';
+      } else if (err.message.includes('Failed to fetch')) {
+        errorMessage = 'No se pudo conectar con el servidor. Verifica que la API esté funcionando.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -78,16 +118,41 @@ export default function MaterialesPublic({ apiBaseUrl = '/api' }) {
           </svg>
         </div>
         <h3 class="text-xl font-bold text-gray-800 mb-2">Error al cargar materiales</h3>
-        <p class="text-gray-600 mb-4">{error}</p>
-        <button
-          onClick={retry}
-          class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition inline-flex items-center gap-2"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
-          {retryCount > 0 ? `Reintentar (${retryCount})` : 'Reintentar'}
-        </button>
+        <p class="text-gray-600 mb-4 max-w-md mx-auto">{error}</p>
+        
+        {diagnostics && (
+          <details class="text-left max-w-2xl mx-auto mb-4 bg-gray-50 rounded-lg p-4">
+            <summary class="cursor-pointer font-medium text-gray-700 mb-2">
+              🔍 Información de diagnóstico (clic para ver)
+            </summary>
+            <pre class="text-xs overflow-auto bg-white p-3 rounded border">
+              {JSON.stringify(diagnostics, null, 2)}
+            </pre>
+          </details>
+        )}
+        
+        <div class="flex gap-3 justify-center">
+          <button
+            onClick={retry}
+            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition inline-flex items-center gap-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            {retryCount > 0 ? `Reintentar (${retryCount})` : 'Reintentar'}
+          </button>
+          
+          <a
+            href={`${apiBaseUrl}/health`}
+            target="_blank"
+            class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition inline-flex items-center gap-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Ver Health Check
+          </a>
+        </div>
       </div>
     );
   }

@@ -3,18 +3,46 @@ import { getMaterialesWrapper as getMateriales, getMaterialById, createMaterialW
 export const prerender = false;
 
 export async function GET({ url }) {
+  console.log('📡 GET /api/materiales - Request recibido');
+  console.log('🌍 Entorno:', {
+    USE_GOOGLE_SHEETS: process.env.USE_GOOGLE_SHEETS,
+    hasGoogleSheetId: !!process.env.GOOGLE_SHEET_ID,
+    hasCredentials: !!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH)
+  });
+  
   try {
     const materia = url.searchParams.get('materia');
     const id = url.searchParams.get('id');
+    
+    console.log('🔍 Parámetros:', { materia, id });
+    console.log('⏳ Llamando a getMateriales...');
+    
     const data = id ? await getMaterialById(id) : await getMateriales(materia);
+    
+    console.log('✅ Materiales obtenidos:', Array.isArray(data) ? data.length : 1);
+    
     return new Response(JSON.stringify(data), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Access-Control-Allow-Origin': '*'
+      }
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('❌ Error en GET /api/materiales:', error);
+    console.error('Stack:', error.stack);
+    
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
     });
   }
 }
