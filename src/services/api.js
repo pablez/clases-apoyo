@@ -10,6 +10,29 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const mockPath = path.resolve(__dirname, '../../data/mock.json');
 
+// Función de retry con backoff exponencial
+async function retryWithBackoff(fn, maxRetries = 3, delayMs = 1000) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Intento ${attempt}/${maxRetries}`);
+      const result = await fn();
+      console.log(`✅ Éxito en intento ${attempt}`);
+      return result;
+    } catch (error) {
+      lastError = error;
+      console.error(`❌ Intento ${attempt} falló:`, error.message);
+      if (attempt < maxRetries) {
+        const delay = delayMs * Math.pow(2, attempt - 1); // Backoff exponencial
+        console.log(`⏳ Esperando ${delay}ms antes del siguiente intento...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  console.error(`❌ Todos los intentos fallaron. Último error:`, lastError.message);
+  throw lastError;
+}
+
 async function requestSheety(pathname, opts = {}) {
   const url = `${SHEETY_BASE.replace(/\/$/, '')}/${pathname.replace(/^\//, '')}`;
   const headers = { 'Content-Type': 'application/json' };
@@ -420,7 +443,7 @@ async function deleteAsistenciaFromSheets(id) {
 
 // ===== MATERIALES con Google Sheets =====
 async function getMaterialesFromSheets(materia) {
-  try {
+  return retryWithBackoff(async () => {
     console.log('📚 getMaterialesFromSheets iniciado');
     console.log('🔍 Materia filtro:', materia);
     const gs = await getGoogleSheetsModule();
@@ -428,21 +451,26 @@ async function getMaterialesFromSheets(materia) {
     console.log('📊 Leyendo hoja Materiales...');
     const rows = await gs.readSheetRange('Materiales!A1:F100');
     console.log(`📊 Filas leídas de Materiales: ${rows.length}`);
+    
+    if (!rows || rows.length === 0) {
+      throw new Error('La hoja Materiales está vacía o no se pudo leer');
+    }
+    
     console.log('📋 Primera fila (headers):', rows[0]);
     const all = gs.rowsToObjects(rows);
     console.log(`📋 Materiales encontrados: ${all.length}`);
-    if (all.length > 0) {
+    
+    if (all.length === 0) {
+      console.warn('⚠️ No hay materiales en la hoja');
+    } else {
       console.log('📄 Primer material:', all[0]);
     }
+    
     if (!materia) return all;
     const filtered = all.filter(m => m.materia === materia);
     console.log(`🔍 Materiales filtrados por "${materia}": ${filtered.length}`);
     return filtered;
-  } catch (error) {
-    console.error('❌ Error en getMaterialesFromSheets:', error.message);
-    console.error('📚 Stack:', error.stack);
-    throw error;
-  }
+  }, 3, 1000);
 }
 
 async function createMaterialInSheets(payload) {
