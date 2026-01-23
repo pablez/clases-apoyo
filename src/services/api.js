@@ -420,16 +420,29 @@ async function deleteAsistenciaFromSheets(id) {
 
 // ===== MATERIALES con Google Sheets =====
 async function getMaterialesFromSheets(materia) {
-  const gs = await getGoogleSheetsModule();
-  console.log('📊 Leyendo hoja Materiales...');
-  const rows = await gs.readSheetRange('Materiales!A1:F100');
-  console.log(`📊 Filas leídas de Materiales: ${rows.length}`);
-  const all = gs.rowsToObjects(rows);
-  console.log(`📋 Materiales encontrados: ${all.length}`, all);
-  if (!materia) return all;
-  const filtered = all.filter(m => m.materia === materia);
-  console.log(`🔍 Materiales filtrados por "${materia}": ${filtered.length}`);
-  return filtered;
+  try {
+    console.log('📚 getMaterialesFromSheets iniciado');
+    console.log('🔍 Materia filtro:', materia);
+    const gs = await getGoogleSheetsModule();
+    console.log('✅ GoogleSheets module obtenido');
+    console.log('📊 Leyendo hoja Materiales...');
+    const rows = await gs.readSheetRange('Materiales!A1:F100');
+    console.log(`📊 Filas leídas de Materiales: ${rows.length}`);
+    console.log('📋 Primera fila (headers):', rows[0]);
+    const all = gs.rowsToObjects(rows);
+    console.log(`📋 Materiales encontrados: ${all.length}`);
+    if (all.length > 0) {
+      console.log('📄 Primer material:', all[0]);
+    }
+    if (!materia) return all;
+    const filtered = all.filter(m => m.materia === materia);
+    console.log(`🔍 Materiales filtrados por "${materia}": ${filtered.length}`);
+    return filtered;
+  } catch (error) {
+    console.error('❌ Error en getMaterialesFromSheets:', error.message);
+    console.error('📚 Stack:', error.stack);
+    throw error;
+  }
 }
 
 async function createMaterialInSheets(payload) {

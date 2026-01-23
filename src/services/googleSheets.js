@@ -21,13 +21,18 @@ async function getGoogleSheetsClient() {
   // OPCIÓN 1: Credenciales desde variable de entorno (PRODUCCIÓN - Netlify)
   if (GOOGLE_SERVICE_ACCOUNT_JSON) {
     console.log('🔑 Usando credenciales desde variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON');
+    console.log('📏 Longitud del JSON:', GOOGLE_SERVICE_ACCOUNT_JSON.length);
     try {
       const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
+      console.log('✅ JSON parseado correctamente');
+      console.log('📧 Service account email:', credentials.client_email);
+      console.log('🔑 Project ID:', credentials.project_id);
       auth = new google.auth.GoogleAuth({
         credentials,
         scopes: ['https://www.googleapis.com/auth/spreadsheets'],
       });
     } catch (error) {
+      console.error('❌ Error al parsear GOOGLE_SERVICE_ACCOUNT_JSON:', error.message);
       throw new Error(`Error al parsear GOOGLE_SERVICE_ACCOUNT_JSON: ${error.message}`);
     }
   }
