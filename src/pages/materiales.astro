@@ -1,90 +1,16 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import MaterialCard from '../components/MaterialCard.astro';
-import { getMaterialesWrapper } from '../services/api.js';
+import MaterialesPublic from '../components/MaterialesPublic.jsx';
 
-const title = 'Materiales';
-export const prerender = false; // Cambiar a false para SSR con Google Sheets
-
-// Fetch materiales en server side
-let materiales = [];
-try {
-  console.log('📚 Cargando materiales para página pública...');
-  materiales = await getMaterialesWrapper();
-  console.log('✅ Materiales cargados:', materiales.length);
-} catch (error) {
-  console.error('❌ Error loading materiales:', error);
-}
-
-const materias = ['Todas', 'Matemáticas', 'Física', 'Química', 'Programación'];
+const title = 'Materiales Educativos';
 ---
 
 <Layout title={title}>
-  <h1 class="text-3xl font-bold mb-6">Materiales Educativos</h1>
-  
-  <!-- Filtros por materia -->
-  <div class="mb-8 flex gap-3 flex-wrap">
-    {materias.map(materia => (
-      <button
-        data-materia={materia}
-        class="px-4 py-2 rounded-lg border-2 transition materia-filter"
-        class:list={[
-          materia === 'Todas' 
-            ? 'border-blue-500 bg-blue-50 text-blue-700' 
-            : 'border-gray-200 hover:border-gray-300'
-        ]}
-      >
-        {materia}
-      </button>
-    ))}
+  <div class="mb-8">
+    <h1 class="text-4xl font-bold text-gray-800 mb-2">Materiales Educativos</h1>
+    <p class="text-gray-600">Descubre recursos de aprendizaje para diferentes materias</p>
   </div>
-
-  {materiales.length === 0 ? (
-    <div class="text-center py-12">
-      <p class="text-gray-500">No hay materiales disponibles en este momento.</p>
-      <p class="text-sm text-gray-400 mt-2">
-        Vuelve pronto para encontrar nuevos recursos educativos.
-      </p>
-    </div>
-  ) : (
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {materiales.map(material => (
-        <div data-materia={material.materia} class="material-item">
-          <MaterialCard material={material} />
-        </div>
-      ))}
-    </div>
-  )}
-
-  <script>
-    const filters = document.querySelectorAll('.materia-filter');
-    const items = document.querySelectorAll('.material-item');
-
-    filters.forEach(filter => {
-      filter.addEventListener('click', () => {
-        const selectedMateria = filter.dataset.materia;
-        
-        // Update active filter style
-        filters.forEach(f => {
-          if (f === filter) {
-            f.classList.add('border-blue-500', 'bg-blue-50', 'text-blue-700');
-            f.classList.remove('border-gray-200');
-          } else {
-            f.classList.remove('border-blue-500', 'bg-blue-50', 'text-blue-700');
-            f.classList.add('border-gray-200');
-          }
-        });
-
-        // Filter items
-        items.forEach(item => {
-          if (selectedMateria === 'Todas' || item.dataset.materia === selectedMateria) {
-            item.style.display = 'block';
-          } else {
-            item.style.display = 'none';
-          }
-        });
-      });
-    });
-  </script>
+  
+  <MaterialesPublic client:load apiBaseUrl="/api" />
 </Layout>
 
