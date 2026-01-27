@@ -179,6 +179,10 @@ export async function deleteAlumno(id) {
   if (idx === -1) throw new Error('Alumno no encontrado');
   list.splice(idx, 1);
   mock.alumnos = list;
+  // Eliminar asistencias asociadas en mock (cascade)
+  if (mock.asistencias && Array.isArray(mock.asistencias)) {
+    mock.asistencias = mock.asistencias.filter(a => String(a.id_alumno || a.alumnoId || a.alumno) !== String(id));
+  }
   await writeMock(mock);
   return { success: true };
 }
@@ -348,6 +352,22 @@ async function deleteAlumnoFromSheets(id) {
   // Limpiar la fila (Google Sheets API no tiene delete row directo)
   await gs.updateSheetRange(`Alumnos!A${rowNumber}:H${rowNumber}`, [['', '', '', '', '', '', '', '']]);
   
+  // Eliminar en cascada: limpiar filas en Asistencias donde id_alumno coincida
+  try {
+    const rowsA = await gs.readSheetRange('Asistencias!A1:F100');
+    const asistencias = gs.rowsToObjects(rowsA);
+    const rowsToClear = [];
+    asistencias.forEach((a, i) => {
+      const idAl = a.id_alumno || a.alumnoId || a.alumno;
+      if (String(idAl) === String(id)) rowsToClear.push(i + 2); // +2 para compensar header y base-1
+    });
+    for (const r of rowsToClear) {
+      await gs.updateSheetRange(`Asistencias!A${r}:F${r}`, [['', '', '', '', '', '']]);
+    }
+  } catch (e) {
+    console.error('Error eliminando asistencias en cascada:', e.message);
+  }
+
   return { success: true };
 }
 

@@ -16,12 +16,46 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
     telefono_padre: '',
     materias: '',
     clases_compradas: '',
-    horas: ''
+    horas: '',
+    fecha_proxima: '',
+    hora_proxima: ''
   });
 
   useEffect(() => {
     loadAlumnos();
   }, []);
+
+  // Listen for calendar assign events (select existing alumno from calendar)
+  useEffect(() => {
+    function onAssign(e) {
+      const detail = e.detail || {};
+      const { alumnoId, date, hour } = detail;
+      // find alumno in current list
+      const found = alumnos.find(a => String(a.id || a.id_alumno) === String(alumnoId));
+      if (found) {
+        editAlumno(found);
+        // prefill next class date/hora if creating/editing
+        let dateForInput = '';
+        if (date && /\d{2}\/\d{2}\/\d{4}/.test(date)) {
+          const [d, m, y] = date.split('/');
+          dateForInput = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+        setFormData(prev => ({ ...prev, fecha_proxima: dateForInput, hora_proxima: hour || '' }));
+      } else {
+        // If not found, still open create with prefilled date
+        startCreating();
+        let dateForInput = '';
+        if (date && /\d{2}\/\d{2}\/\d{4}/.test(date)) {
+          const [d, m, y] = date.split('/');
+          dateForInput = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+        setTimeout(() => setFormData(prev => ({ ...prev, fecha_proxima: dateForInput, hora_proxima: hour || '' })), 60);
+      }
+    }
+
+    window.addEventListener('calendar-assign', onAssign);
+    return () => window.removeEventListener('calendar-assign', onAssign);
+  }, [alumnos]);
 
   async function loadAlumnos() {
     setLoading(true);
@@ -46,11 +80,35 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
       telefono_padre: '',
       materias: '',
       clases_compradas: '',
-      horas: ''
+      horas: '',
+      fecha_proxima: '',
+      hora_proxima: ''
     });
     setEditingId(null);
     setIsCreating(false);
   }
+
+  // Listen for calendar reservations
+  useEffect(() => {
+    function onReserve(e) {
+      const detail = e.detail || {};
+      const { date, hour } = detail; // date: DD/MM/YYYY, hour: 'HH:MM'
+      startCreating();
+      let dateForInput = '';
+      if (date && /\d{2}\/\d{2}\/\d{4}/.test(date)) {
+        const [d, m, y] = date.split('/');
+        dateForInput = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+      setTimeout(() => {
+        setFormData(prev => ({ ...prev, fecha_proxima: dateForInput, hora_proxima: hour || '' }));
+        const el = document.getElementById('nombre-input');
+        if (el) el.focus();
+      }, 80);
+    }
+
+    window.addEventListener('calendar-reserve', onReserve);
+    return () => window.removeEventListener('calendar-reserve', onReserve);
+  }, []);
 
   function startCreating() {
     resetForm();
@@ -288,9 +346,32 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
             {isCreating ? 'Crear Nuevo Alumno' : 'Editar Alumno'}
           </h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {isCreating && (
+              <>
+                <div>
+                  <label class="block text-sm font-medium mb-1">Fecha primera clase</label>
+                  <input
+                    type="date"
+                    value={formData.fecha_proxima}
+                    onInput={(e) => setFormData({ ...formData, fecha_proxima: e.target.value })}
+                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1">Hora preferida</label>
+                  <input
+                    type="time"
+                    value={formData.hora_proxima}
+                    onInput={(e) => setFormData({ ...formData, hora_proxima: e.target.value })}
+                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </>
+            )}
             <div>
               <label class="block text-sm font-medium mb-1">Nombre *</label>
               <input
+                id="nombre-input"
                 type="text"
                 value={formData.nombre}
                 onInput={(e) => setFormData({ ...formData, nombre: e.target.value })}

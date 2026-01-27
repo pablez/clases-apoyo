@@ -3,6 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import AttendanceManager from '../components/AttendanceManager.jsx';
 import AlumnosManager from '../components/AlumnosManager.jsx';
 import MaterialesManager from '../components/MaterialesManager.jsx';
+import CalendarManager from '../components/CalendarManager.jsx';
 
 const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
 ---
@@ -99,6 +100,13 @@ const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
           <span class="hidden sm:inline">📚 Materiales</span>
           <span class="sm:hidden">📚</span>
         </button>
+        <button 
+          class="tab-button px-3 sm:px-4 py-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 text-sm sm:text-base whitespace-nowrap"
+          data-tab="calendario"
+        >
+          <span class="hidden sm:inline">📅 Calendario</span>
+          <span class="sm:hidden">📅</span>
+        </button>
       </nav>
     </div>
 
@@ -113,6 +121,10 @@ const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
 
     <div id="tab-materiales" class="tab-content hidden">
       <MaterialesManager client:load apiBaseUrl="/api" />
+    </div>
+
+    <div id="tab-calendario" class="tab-content hidden">
+      <CalendarManager client:load apiBaseUrl="/api" />
     </div>
   </div>
 
