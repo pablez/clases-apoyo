@@ -1,3 +1,55 @@
+import {
+  getAsistenciasFromSheets,
+  createAsistenciaInSheets,
+  updateAsistenciaInSheets,
+  deleteAsistenciaFromSheets,
+} from './src/infrastructure/googleSheetsAdapter.js';
+
+async function run() {
+  if (!process.env.GOOGLE_SHEET_ID) {
+    console.error('ERROR: Debes definir GOOGLE_SHEET_ID y credenciales (GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_KEY_PATH)');
+    process.exit(1);
+  }
+
+  console.log('=== Test de integración Google Sheets - inicio ===');
+
+  try {
+    const allBefore = await getAsistenciasFromSheets();
+    console.log('Asistencias totales antes:', Array.isArray(allBefore) ? allBefore.length : allBefore);
+
+    const alumnoId = `test-alumno-${Date.now()}`;
+    const payload = {
+      id_alumno: alumnoId,
+      fecha: new Date().toISOString().slice(0,10),
+      hora: '12:34',
+      estado: 'Presente',
+      observaciones: 'Prueba de integración automática'
+    };
+
+    const created = await createAsistenciaInSheets(payload);
+    console.log('Creada asistencia:', created);
+
+    const matched = await getAsistenciasFromSheets(alumnoId);
+    console.log('Asistencias para alumno creado:', Array.isArray(matched) ? matched.length : matched);
+
+    const updated = await updateAsistenciaInSheets(created.id, { estado: 'Justificado' });
+    console.log('Asistencia actualizada:', updated);
+
+    const deleted = await deleteAsistenciaFromSheets(created.id);
+    console.log('Asistencia eliminada:', deleted);
+
+    const allAfter = await getAsistenciasFromSheets();
+    console.log('Asistencias totales después:', Array.isArray(allAfter) ? allAfter.length : allAfter);
+
+    console.log('=== Test de integración Google Sheets - finalizado correctamente ===');
+    process.exit(0);
+  } catch (err) {
+    console.error('ERROR en test de integración:', err);
+    process.exit(2);
+  }
+}
+
+run();
 // Script de prueba para verificar conexión con Google Sheets
 import 'dotenv/config';
 import { google } from 'googleapis';

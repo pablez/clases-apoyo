@@ -14,6 +14,9 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
     edad: '',
     curso: '',
     telefono_padre: '',
+    email: '',
+    password: '',
+    rol: 'padre',
     materias: '',
     clases_compradas: '',
     horas: '',
@@ -78,6 +81,9 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
       edad: '',
       curso: '',
       telefono_padre: '',
+      email: '',
+      password: '',
+      rol: 'padre',
       materias: '',
       clases_compradas: '',
       horas: '',
@@ -123,10 +129,28 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
       edad: alumno.edad || '',
       curso: alumno.curso || '',
       telefono_padre: alumno.telefono_padre || '',
+      email: '',
+      password: '',
+      rol: 'padre',
       materias: Array.isArray(alumno.materias) ? alumno.materias.join(', ') : '',
       clases_compradas: alumno.clases_compradas || '',
       horas: alumno.horas || ''
     });
+
+    // Intentar obtener usuario asociado y prefilar email/rol (no bloquear la UI)
+    (async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/usuarios`);
+        if (!res.ok) return;
+        const users = await res.json();
+        const found = (users || []).find(u => String(u.id_alumno || (u.alumno && u.alumno.id) || u.alumnoId) === String(alumno.id) || String(u.id_alumno) === String(alumno.id));
+        if (found) {
+          setFormData(prev => ({ ...prev, email: found.email || '', rol: found.rol || prev.rol }));
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
   }
 
   async function handleSave() {
@@ -151,14 +175,18 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
         }
         setSuccessMessage('✅ Alumno creado y guardado en Google Sheets correctamente');
       } else {
+        console.log('🔁 Enviando PUT para id:', editingId, 'payload:', payload);
         const res = await fetch(`${apiBaseUrl}/alumnos/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || 'Error al actualizar alumno');
+          let errorText = '';
+          try { errorText = await res.text(); } catch (e) { errorText = String(e); }
+          console.error('PUT /api/alumnos error response:', res.status, errorText);
+          const errorData = (() => { try { return JSON.parse(errorText); } catch { return null } })();
+          throw new Error((errorData && errorData.error) || `Error al actualizar alumno (${res.status})`);
         }
         setSuccessMessage('✅ Alumno actualizado en Google Sheets correctamente');
       }
@@ -346,7 +374,7 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
             {isCreating ? 'Crear Nuevo Alumno' : 'Editar Alumno'}
           </h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {isCreating && (
+            {(isCreating || editingId) && (
               <>
                 <div>
                   <label class="block text-sm font-medium mb-1">Fecha primera clase</label>
@@ -365,6 +393,38 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
                     onInput={(e) => setFormData({ ...formData, hora_proxima: e.target.value })}
                     class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1">Email (usuario)</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onInput={(e) => setFormData({ ...formData, email: e.target.value })}
+                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                    placeholder="padre@example.com"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1">Password (usuario)</label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onInput={(e) => setFormData({ ...formData, password: e.target.value })}
+                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                    placeholder="123456"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1">Rol</label>
+                  <select
+                    value={formData.rol}
+                    onInput={(e) => setFormData({ ...formData, rol: e.target.value })}
+                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="padre">padre</option>
+                    <option value="alumno">alumno</option>
+                    <option value="admin">admin</option>
+                  </select>
                 </div>
               </>
             )}

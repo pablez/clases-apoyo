@@ -3,13 +3,35 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 
-const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || '';
-const GOOGLE_SERVICE_ACCOUNT_KEY_PATH = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || '';
-const GOOGLE_SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '';
+const DEFAULT_GOOGLE_SHEET_ID = '13MCWCQV1VL9PBzByW-mJo0mbenYSeX_OTf9MJVwDO10';
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || DEFAULT_GOOGLE_SHEET_ID;
+let GOOGLE_SERVICE_ACCOUNT_KEY_PATH = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || '';
+let GOOGLE_SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '';
+
+// Detectar credencial local por defecto si existe en el repo (educacion-llave.json)
+try {
+  const baseDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.resolve(process.cwd(), 'educacion-llave.json'),
+    path.resolve(process.cwd(), 'gestor-asistencia', 'educacion-llave.json'),
+    path.resolve(baseDir, '..', '..', 'educacion-llave.json'),
+  ];
+  for (const p of candidates) {
+    if (!GOOGLE_SERVICE_ACCOUNT_KEY_PATH && fs.existsSync(p)) {
+      GOOGLE_SERVICE_ACCOUNT_KEY_PATH = p;
+      break;
+    }
+  }
+} catch (e) {
+  // ignore
+}
 
 // Validación inicial de configuración
 console.log('🔧 Configuración de Google Sheets:');
-console.log('  GOOGLE_SHEET_ID:', GOOGLE_SHEET_ID ? `${GOOGLE_SHEET_ID.substring(0, 10)}...` : '❌ NO DEFINIDO');
+const sheetIdDisplay = GOOGLE_SHEET_ID
+  ? `${GOOGLE_SHEET_ID.substring(0, 10)}...` + (GOOGLE_SHEET_ID === DEFAULT_GOOGLE_SHEET_ID ? ' (USANDO ID POR DEFECTO)' : '')
+  : '❌ NO DEFINIDO';
+console.log('  GOOGLE_SHEET_ID:', sheetIdDisplay);
 console.log('  GOOGLE_SERVICE_ACCOUNT_JSON:', GOOGLE_SERVICE_ACCOUNT_JSON ? `✅ Definido (${GOOGLE_SERVICE_ACCOUNT_JSON.length} caracteres)` : '❌ No definido');
 console.log('  GOOGLE_SERVICE_ACCOUNT_KEY_PATH:', GOOGLE_SERVICE_ACCOUNT_KEY_PATH ? `✅ ${GOOGLE_SERVICE_ACCOUNT_KEY_PATH}` : '❌ No definido');
 
@@ -135,6 +157,30 @@ export async function updateSheetRange(range, values) {
 }
 
 /**
+ * Añade filas al final de un rango (append)
+ * @param {string} range - Ejemplo: "Usuarios!A:D"
+ * @param {Array} values - Array de arrays con las filas a añadir
+ */
+export async function appendSheetRange(range, values) {
+  console.log(`✳️ Appending rango: ${range}`);
+  try {
+    const sheets = await getGoogleSheetsClient();
+    const response = await sheets.spreadsheets.values.append({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values },
+    });
+    console.log('✅ Append exitoso');
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Error al hacer append ${range}:`, error.message);
+    throw new Error(`Error al append en Google Sheets (${range}): ${error.message}`);
+  }
+}
+
+/**
  * Convierte filas de Google Sheets a objetos
  * Asume que la primera fila son los encabezados
  */
@@ -148,6 +194,57 @@ export function rowsToObjects(rows) {
     });
     return obj;
   });
+}
+
+/**
+ * Lee la hoja `Usuarios` y la convierte a objetos.
+ * Se espera que la primera fila contenga encabezados como:
+ * id_usuario, id_alumno, email, rol
+ */
+export async function readUsuarios() {
+  const range = 'Usuarios!A1:Z100';
+  const rows = await readSheetRange(range);
+  return rowsToObjects(rows);
+}
+
+/**
+ * Devuelve un mapa de usuarios por id_usuario para uso interno
+ */
+export async function usuariosMap() {
+  const rows = await readUsuarios();
+  const map = new Map();
+  rows.forEach(u => {
+    const id = u.id_usuario || u.id || u.usuarioId || u.idUsuario || '';
+    if (id) map.set(String(id), u);
+  });
+  return map;
+}
+
+/**
+ * Conveniencia para leer las tres hojas principales y devolverlas como objetos
+ * { alumnos, asistencias, materiales, usuarios }
+ */
+export async function readAllData() {
+  const [rowsAlumnos, rowsAsistencias, rowsMateriales] = await Promise.all([
+    readSheetRange('Alumnos!A1:H100'),
+    readSheetRange('Asistencias!A1:F100'),
+    readSheetRange('Materiales!A1:F100'),
+  ]);
+
+  const data = {
+    alumnos: rowsToObjects(rowsAlumnos),
+    asistencias: rowsToObjects(rowsAsistencias),
+    materiales: rowsToObjects(rowsMateriales),
+    usuarios: [],
+  };
+
+  try {
+    data.usuarios = await readUsuarios();
+  } catch (err) {
+    console.warn('⚠️ No se pudo leer la hoja Usuarios (puede que no exista aún):', err.message);
+  }
+
+  return data;
 }
 
 /**

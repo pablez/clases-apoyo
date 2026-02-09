@@ -1,16 +1,13 @@
-import { 
-  getAlumnos, 
-  getAsistencias, 
-  updateAsistencia, 
-  getMateriales, 
-  getMaterialById,
-  createAlumno,
-  updateAlumno,
-  deleteAlumno,
-  createMaterial,
-  updateMaterial,
-  deleteMaterial
-} from '../../services/api.js';
+async function resolveRepoFor(endpoint) {
+  const useSheets = process.env.USE_GOOGLE_SHEETS === 'true';
+  if (useSheets) {
+    if (endpoint === 'alumnos') return import('../../infrastructure/sheets/index.js');
+    if (endpoint === 'asistencias') return import('../../infrastructure/sheets/asistencias.js');
+    if (endpoint === 'materiales') return import('../../infrastructure/sheets/materiales.js');
+    return import('../../infrastructure/sheets/index.js');
+  }
+  return import('../../infrastructure/mock/index.js');
+}
 
 export const prerender = false;
 
@@ -18,31 +15,24 @@ export async function GET({ params, url }) {
   const endpoint = params.endpoint;
   
   try {
-    if (endpoint === 'alumnos') {
-      const data = await getAlumnos();
-      return new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const repo = await resolveRepoFor(endpoint);
+
+    if (endpoint === 'alumnos' && repo.getAlumnos) {
+      const data = await repo.getAlumnos();
+      return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
-    
-    if (endpoint === 'asistencias') {
+
+    if (endpoint === 'asistencias' && repo.getAsistencias) {
       const alumnoId = url.searchParams.get('alumnoId');
-      const data = await getAsistencias(alumnoId);
-      return new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const data = await repo.getAsistencias(alumnoId);
+      return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
     if (endpoint === 'materiales') {
       const materia = url.searchParams.get('materia');
       const id = url.searchParams.get('id');
-      const data = id ? await getMaterialById(id) : await getMateriales(materia);
-      return new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const data = id && repo.getMaterialById ? await repo.getMaterialById(id) : (repo.getMateriales ? await repo.getMateriales(materia) : []);
+      return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
     return new Response(JSON.stringify({ error: 'Endpoint no encontrado' }), {
@@ -61,34 +51,27 @@ export async function PUT({ params, request }) {
   const endpoint = params.endpoint;
   
   try {
-    if (endpoint === 'asistencias') {
+    const repo = await resolveRepoFor(endpoint);
+
+    if (endpoint === 'asistencias' && repo.updateAsistencia) {
       const id = params.id;
       const body = await request.json();
-      const data = await updateAsistencia(id, body);
-      return new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const data = await repo.updateAsistencia(id, body);
+      return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
-    if (endpoint === 'alumnos') {
+    if (endpoint === 'alumnos' && repo.updateAlumno) {
       const id = params.id;
       const body = await request.json();
-      const data = await updateAlumno(id, body);
-      return new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const data = await repo.updateAlumno(id, body);
+      return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
-    if (endpoint === 'materiales') {
+    if (endpoint === 'materiales' && repo.updateMaterial) {
       const id = params.id;
       const body = await request.json();
-      const data = await updateMaterial(id, body);
-      return new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const data = await repo.updateMaterial(id, body);
+      return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
     return new Response(JSON.stringify({ error: 'Endpoint no encontrado' }), {
@@ -107,22 +90,18 @@ export async function POST({ params, request }) {
   const endpoint = params.endpoint;
   
   try {
-    if (endpoint === 'alumnos') {
+    const repo = await resolveRepoFor(endpoint);
+
+    if (endpoint === 'alumnos' && repo.createAlumno) {
       const body = await request.json();
-      const data = await createAlumno(body);
-      return new Response(JSON.stringify(data), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const data = await repo.createAlumno(body);
+      return new Response(JSON.stringify(data), { status: 201, headers: { 'Content-Type': 'application/json' } });
     }
 
-    if (endpoint === 'materiales') {
+    if (endpoint === 'materiales' && repo.createMaterial) {
       const body = await request.json();
-      const data = await createMaterial(body);
-      return new Response(JSON.stringify(data), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const data = await repo.createMaterial(body);
+      return new Response(JSON.stringify(data), { status: 201, headers: { 'Content-Type': 'application/json' } });
     }
 
     return new Response(JSON.stringify({ error: 'Endpoint no encontrado' }), {
@@ -142,20 +121,15 @@ export async function DELETE({ params }) {
   const id = params.id;
   
   try {
-    if (endpoint === 'alumnos' && id) {
-      await deleteAlumno(id);
-      return new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const repo = await resolveRepoFor(endpoint);
+    if (endpoint === 'alumnos' && id && repo.deleteAlumno) {
+      await repo.deleteAlumno(id);
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
-    if (endpoint === 'materiales' && id) {
-      await deleteMaterial(id);
-      return new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (endpoint === 'materiales' && id && repo.deleteMaterial) {
+      await repo.deleteMaterial(id);
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
     return new Response(JSON.stringify({ error: 'Endpoint o ID no encontrado' }), {
