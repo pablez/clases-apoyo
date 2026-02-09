@@ -18,62 +18,17 @@ const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
           </svg>
         </div>
         <h1 class="text-2xl sm:text-3xl font-bold mb-2">Panel de Administración</h1>
-        <p class="text-gray-600 text-sm sm:text-base">Ingresa la contraseña para acceder</p>
+        <p class="text-gray-600 text-sm sm:text-base">Accediendo... si no estás autenticado serás redirigido al formulario de acceso</p>
       </div>
-      <form id="login-form" onsubmit="return false;" class="space-y-4">
-        <input
-          type="text"
-          name="username"
-          autocomplete="username"
-          style="display:none;"
-          value="admin"
-        />
-        <div>
-          <label for="password-input" class="block text-sm font-medium text-gray-700 mb-2">
-            Contraseña
-          </label>
-          <input
-            type="password"
-            id="password-input"
-            name="password"
-            placeholder="••••••••"
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-            autocomplete="current-password"
-          />
-        </div>
-        <button
-          id="login-btn"
-          type="submit"
-          class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium text-base sm:text-lg flex items-center justify-center gap-2"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
-          </svg>
-          Acceder
-        </button>
-        <p id="error-msg" class="text-red-600 text-sm text-center mt-3 hidden flex items-center justify-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          Contraseña incorrecta
-        </p>
-      </form>
+      <div class="text-center">
+        <div class="inline-block px-4 py-2 bg-gray-100 rounded">Comprobando credenciales...</div>
+      </div>
     </div>
   </div>
 
   <div id="admin-panel" class="hidden">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
       <h1 class="text-2xl sm:text-3xl font-bold">Panel de Gestión</h1>
-      <button
-        id="logout-btn"
-        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm sm:text-base inline-flex items-center justify-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-        </svg>
-        <span class="hidden sm:inline">Cerrar Sesión</span>
-        <span class="sm:hidden">Salir</span>
-      </button>
     </div>
     
     <!-- Pestañas - Responsive -->
@@ -135,41 +90,52 @@ const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
     const loginBtn = document.getElementById('login-btn');
     const errorMsg = document.getElementById('error-msg');
 
-    // Check if already authenticated
-    if (sessionStorage.getItem('admin_auth') === 'true') {
-      authContainer.classList.add('hidden');
-      adminPanel.classList.remove('hidden');
-    }
+    // Immediately verify server-side auth (token or cookie). If not admin, redirect to /login
+    (async function(){
+      try {
+        let token = null;
+        try { token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'); } catch(e) { token = null; }
 
-    loginBtn.addEventListener('click', () => {
-      const password = passwordInput.value;
-      if (password === ADMIN_PASSWORD) {
-        sessionStorage.setItem('admin_auth', 'true');
+        // Try 1: prefer cookie-based auth (credentials only) to avoid stale tokens in storage
+        let resp = await fetch('/api/alumno/asistencias', { credentials: 'include' });
+
+        // If cookie auth failed and we have a stored token, try again with Authorization header
+        if ((!resp || !resp.ok) && token) {
+          resp = await fetch('/api/alumno/asistencias', { credentials: 'include', headers: { Authorization: `Bearer ${token}` } });
+        }
+
+        if (!resp || !resp.ok) {
+          // not authenticated
+          window.location.href = '/login';
+          return;
+        }
+
+        const body = await resp.json();
+        const isAdmin = body && body.alumno && body.alumno._usuario && String(body.alumno._usuario.rol || '').toLowerCase() === 'admin';
+        if (!isAdmin) {
+          window.location.href = '/login';
+          return;
+        }
+
+        // mark admin flag for Navbar and show panel
+        try { sessionStorage.setItem('admin_auth', 'true'); } catch(e){}
         authContainer.classList.add('hidden');
         adminPanel.classList.remove('hidden');
-        errorMsg.classList.add('hidden');
-      } else {
-        errorMsg.classList.remove('hidden');
-        passwordInput.value = '';
+      } catch (e) {
+        console.warn('Auth check failed:', e && e.message);
+        window.location.href = '/login';
       }
-    });
+    })();
 
-    passwordInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        loginBtn.click();
-      }
-    });
-
-    // Logout functionality
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => {
-        if (confirm('¿Cerrar sesión?')) {
-          sessionStorage.removeItem('admin_auth');
-          location.reload();
+    if (passwordInput) {
+      passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          try { loginBtn && loginBtn.click(); } catch (err) {}
         }
       });
     }
+
+    // Logout removed: authentication is handled via LoginForm and global navbar
 
     // Tabs functionality
     const tabButtons = document.querySelectorAll('.tab-button');

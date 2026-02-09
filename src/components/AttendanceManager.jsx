@@ -19,6 +19,11 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
   const [showDateDetails, setShowDateDetails] = useState(null); // Fecha seleccionada para ver detalles
 
   useEffect(() => {
+    // debug markers removed in production patch
+    return () => {};
+  }, []);
+
+  useEffect(() => {
     loadAlumnos();
   }, []);
 
@@ -37,7 +42,19 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
       const res = await fetch(`${apiBaseUrl}/alumnos`);
       if (!res.ok) throw new Error('Error al cargar alumnos');
       const data = await res.json();
-      setAlumnos(data);
+      // Normalizar materias: asegurar que sea un array
+      const normalized = (data || []).map(a => {
+        let materias = a.materias;
+        if (Array.isArray(materias)) {
+          // ok
+        } else if (typeof materias === 'string') {
+          materias = materias.split(',').map(s => s.trim()).filter(Boolean);
+        } else {
+          materias = [];
+        }
+        return { ...a, materias };
+      });
+      setAlumnos(normalized);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -51,15 +68,24 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
     try {
       const res = await fetch(`${apiBaseUrl}/asistencias?alumnoId=${alumnoId}`);
       if (!res.ok) throw new Error('Error al cargar asistencias');
-      const data = await res.json();
-      
+      const raw = await res.json();
+      // Normalizar cada registro para asegurar campos esperados
+      const data = (raw || []).map(r => ({
+        id: r.id || r.id_asistencia || r.idAsistencia || '',
+        id_alumno: r.id_alumno || r.alumnoId || r.alumno || '',
+        fecha: r.fecha || r.date || '',
+        hora: r.hora || r.time || '',
+        estado: r.estado || r.state || '',
+        observaciones: r.observaciones || r.observacion || r.notes || ''
+      }));
+
       // Ordenar por fecha (más reciente primero o más antigua primero)
       const sortedData = data.sort((a, b) => {
         const dateA = parseDateString(a.fecha);
         const dateB = parseDateString(b.fecha);
         return dateA - dateB; // Orden ascendente (más antigua primero)
       });
-      
+
       setAsistencias(sortedData);
     } catch (err) {
       setError(err.message);
@@ -75,6 +101,13 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
     if (parts.length !== 3) return new Date(0);
     // parts[0] = día, parts[1] = mes, parts[2] = año
     return new Date(parts[2], parts[1] - 1, parts[0]);
+  }
+
+  function getWeekdayName(dateStr) {
+    const d = parseDateString(dateStr);
+    if (!d || isNaN(d.getTime())) return '';
+    const names = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    return names[d.getDay()];
   }
 
   async function updateAsistencia(id, estado) {
@@ -382,6 +415,9 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
   }
 
   const selectedAlumno = alumnos.find(a => String(a.id) === String(selectedAlumnoId));
+  const presentes = asistencias.filter(a => a.estado === 'Presente').length;
+  const faltas = asistencias.filter(a => a.estado === 'Falta').length;
+  const pendientes = asistencias.filter(a => a.estado === 'Pendiente').length;
 
   return (
     <div class="space-y-6">
@@ -437,6 +473,7 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
               <p class="text-sm text-gray-600">
                 Curso: {selectedAlumno.curso || 'N/A'} | Edad: {selectedAlumno.edad || 'N/A'}
               </p>
+              <p class="text-sm text-gray-600 mt-1">Resumen: <strong>{presentes}</strong> presentes · <strong>{faltas}</strong> faltas · <strong>{pendientes}</strong> pendientes</p>
               <p class="text-sm text-gray-600">
                 Teléfono: {selectedAlumno.telefono_padre || 'N/A'}
               </p>
@@ -464,6 +501,9 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
 
           <div class="flex justify-between items-center mb-3">
             <h3 class="font-semibold">Registro de Asistencia</h3>
+            <div class="flex items-center gap-2">
+                {/* debug toggle removed */}
+              </div>
             {selectedAlumno.clases_compradas > asistencias.length && (
               <button
                 onClick={generarFechasClases}
@@ -725,6 +765,8 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
               </div>
             </div>
           )}
+
+          {/* debug panel removed */}
           {loading && <p class="text-gray-500">Cargando...</p>}
           
           {!loading && asistencias.length === 0 && (
@@ -735,11 +777,11 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
 
           {!loading && asistencias.length > 0 && (
             <div class="space-y-2">
-              {asistencias.map(asistencia => (
-                <div
-                  key={asistencia.id}
-                  class="flex flex-col p-3 border rounded-lg"
-                >
+              {asistencias.map((asistencia, idx) => (
+                    <div
+                      key={asistencia.id}
+                      class="flex flex-col p-3 border rounded-lg"
+                    >
                   <div class="flex items-center justify-between mb-2">
                     <div class="flex-1">
                       {editingDateTime === asistencia.id ? (
@@ -779,7 +821,8 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
                       ) : (
                         <div>
                           <div class="flex items-center gap-2">
-                            <div class="font-medium">{asistencia.fecha} - {asistencia.hora || 'N/A'}</div>
+                            <div class="text-xs text-gray-500 px-2 py-0.5 rounded border">#{idx + 1}</div>
+                            <div class="font-medium">{getWeekdayName(asistencia.fecha)} {asistencia.fecha} - {asistencia.hora || 'N/A'}</div>
                             <button
                               onClick={() => startEditDateTime(asistencia)}
                               class="text-xs text-blue-600 hover:underline"

@@ -1,6 +1,10 @@
-import { getMaterialesWrapper as getMateriales, getMaterialById, createMaterialWrapper as createMaterial } from '../../../services/api.js';
-
 export const prerender = false;
+
+async function resolveRepo() {
+  const useSheets = process.env.USE_GOOGLE_SHEETS === 'true';
+  if (useSheets) return import('../../../infrastructure/sheets/materiales.js');
+  return import('../../../infrastructure/mock/index.js');
+}
 
 export async function GET({ url }) {
   console.log('📡 GET /api/materiales - Request recibido');
@@ -17,7 +21,8 @@ export async function GET({ url }) {
     console.log('🔍 Parámetros:', { materia, id });
     console.log('⏳ Llamando a getMateriales...');
     
-    const data = id ? await getMaterialById(id) : await getMateriales(materia);
+    const repo = await resolveRepo();
+    const data = id ? await repo.getMaterialById(id) : await repo.getMateriales(materia);
     
     console.log('✅ Materiales obtenidos:', Array.isArray(data) ? data.length : 1);
     
@@ -50,7 +55,8 @@ export async function GET({ url }) {
 export async function POST({ request }) {
   try {
     const body = await request.json();
-    const data = await createMaterial(body);
+    const repo = await resolveRepo();
+    const data = await repo.createMaterial(body);
     return new Response(JSON.stringify(data), {
       status: 201,
       headers: { 'Content-Type': 'application/json' }

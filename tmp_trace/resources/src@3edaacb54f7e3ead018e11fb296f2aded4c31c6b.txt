@@ -1,0 +1,34 @@
+import { test, expect } from '@playwright/test';
+
+test('login and view asistencias', async ({ page }) => {
+  // Go to login page
+  await page.goto('/login');
+
+  // Programmatic login: call API, set cookie in browser, then navigate to /alumno
+  const loginResp = await page.request.post('/api/auth/login', { data: { email: '1', password: 'test' } });
+  const loginBody = await loginResp.json();
+  if (loginResp.status() !== 200) throw new Error('Login failed in E2E: ' + JSON.stringify(loginBody));
+  const token = loginBody.token;
+  // Set cookie in browser context
+  await page.context().addCookies([{ name: 'session', value: token, url: 'http://localhost:4321', httpOnly: true }]);
+
+  // Now navigate to alumno page
+  await page.goto('/alumno');
+
+  // Wait for asistencias API call
+  const asistenciasResp = await page.waitForResponse(resp => resp.url().includes('/api/alumno/asistencias'), { timeout: 20000 }).catch(() => null);
+  if (asistenciasResp) {
+    // optionally inspect response for debugging; keep minimal in CI
+    const body = await asistenciasResp.json().catch(() => null);
+    // ensure the response was OK
+    if (asistenciasResp.status() !== 200) throw new Error('Asistencias API failed: ' + asistenciasResp.status());
+  }
+
+  // Expect header
+  await expect(page.locator('text=Mi historial de asistencias')).toBeVisible();
+
+  // Expect table rows exist (esperar más tiempo si es necesario)
+  const rows = page.locator('table tbody tr');
+  await page.waitForSelector('table tbody tr', { timeout: 20000 });
+  await expect(rows.first()).toBeVisible({ timeout: 20000 });
+});

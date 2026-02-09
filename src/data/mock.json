@@ -6,7 +6,10 @@
       "edad": 16,
       "curso": "4to Secundaria",
       "telefono_padre": "+51 987654321",
-      "materias": ["Matemáticas", "Física"],
+      "materias": [
+        "Matemáticas",
+        "Física"
+      ],
       "clases_compradas": 10
     },
     {
@@ -15,8 +18,71 @@
       "edad": 15,
       "curso": "3ro Secundaria",
       "telefono_padre": "+51 912345678",
-      "materias": ["Química", "Matemáticas"],
+      "materias": [
+        "Química",
+        "Matemáticas"
+      ],
       "clases_compradas": 8
+    },
+    {
+      "id": "3",
+      "nombre": "Test User",
+      "edad": "99",
+      "curso": "Test"
+    },
+    {
+      "id": "4",
+      "nombre": "Test User",
+      "edad": "99",
+      "curso": "Test"
+    },
+    {
+      "id": "5",
+      "nombre": "Test User",
+      "edad": "99",
+      "curso": "Test"
+    },
+    {
+      "id": "6",
+      "nombre": "Test User",
+      "edad": "99",
+      "curso": "Test"
+    },
+    {
+      "id": "7",
+      "nombre": "Test User",
+      "edad": "99",
+      "curso": "Test"
+    },
+    {
+      "id": "8",
+      "nombre": "Test User",
+      "edad": "99",
+      "curso": "Test"
+    },
+    {
+      "id": "9",
+      "nombre": "Test User",
+      "edad": "99",
+      "curso": "Test"
+    },
+    {
+      "id": "10",
+      "nombre": "Test User",
+      "edad": "99",
+      "curso": "Test"
+    },
+    {
+      "id": "11",
+      "nombre": "Test User",
+      "edad": "99",
+      "curso": "Test"
+    },
+    {
+      "id": "12",
+      "nombre": "Test User",
+      "edad": "99",
+      "curso": "Test"
     }
   ],
   "asistencias": [
