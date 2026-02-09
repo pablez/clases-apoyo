@@ -10,8 +10,7 @@ export default function AlumnoPortal({ apiBaseUrl = '/api' }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [estadoFilter, setEstadoFilter] = useState('Todas');
-  const [fechaFrom, setFechaFrom] = useState('');
-  const [fechaTo, setFechaTo] = useState('');
+  
 
   useEffect(() => {
     // debug markers removed in production patch
@@ -24,11 +23,9 @@ export default function AlumnoPortal({ apiBaseUrl = '/api' }) {
           try { return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'); } catch (e) { return null; }
         })();
         const params = new URLSearchParams();
-        params.set('page', '1');
-        params.set('pageSize', '100');
+        params.set('page', String(page));
+        params.set('pageSize', String(pageSize));
         if (estadoFilter && estadoFilter !== 'Todas') params.set('estado', estadoFilter);
-        if (fechaFrom) params.set('fechaFrom', fechaFrom);
-        if (fechaTo) params.set('fechaTo', fechaTo);
         const url = `${apiBaseUrl}/alumno/asistencias?${params.toString()}`;
         const init = token ? { headers: { Authorization: `Bearer ${token}` } } : { credentials: 'include' };
         const res = await fetch(url, init);
@@ -58,7 +55,7 @@ export default function AlumnoPortal({ apiBaseUrl = '/api' }) {
       }
     }
     load();
-  }, []);
+  }, [estadoFilter, page, pageSize]);
 
   function getWeekdayName(dateStr) {
     if (!dateStr) return '';
@@ -122,48 +119,63 @@ export default function AlumnoPortal({ apiBaseUrl = '/api' }) {
   if (error) return <div class="p-4 text-red-600">{error}</div>;
 
   return (
-    <div class="max-w-4xl mx-auto mt-8 p-4 bg-white rounded shadow">
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+    <div class="max-w-4xl mx-auto mt-8 px-3 sm:px-6 p-6 bg-white rounded-lg shadow-md">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-6">
         <div>
-          <h2 class="text-2xl font-semibold">Mi historial de asistencias</h2>
-          <p class="text-sm text-gray-500">Resumen de tus asistencias por estado</p>
+          <h2 class="text-3xl font-extrabold">Mi historial de asistencias</h2>
+          <p class="text-sm text-gray-500 mt-1">Resumen y estado de tus clases</p>
           {alumno ? (
-            <div class="mt-2 text-sm text-gray-700">
+            <div class="mt-3 text-sm text-gray-700 bg-gray-50 p-3 rounded">
               <div><strong>Estudiante:</strong> {alumno.nombre}</div>
               <div><strong>Materias:</strong> {Array.isArray(alumno.materias) ? alumno.materias.join(', ') : (alumno.materias || '-')}</div>
               <div><strong>Total clases:</strong> {alumno.clases_compradas ?? 0}</div>
             </div>
           ) : null}
         </div>
-        <div class="flex items-center gap-4">
-            <div class="text-center px-3">
-            <div class="text-xl font-bold">{presentes}</div>
+        <div class="flex items-center gap-3">
+          <div class="text-center px-3 py-2 bg-green-50 rounded-md shadow-sm">
+            <div class="text-2xl font-bold">{presentes}</div>
             <div class="text-xs text-green-600">Presentes</div>
           </div>
-          <div class="text-center px-3">
-            <div class="text-xl font-bold">{faltas}</div>
+          <div class="text-center px-3 py-2 bg-red-50 rounded-md shadow-sm">
+            <div class="text-2xl font-bold">{faltas}</div>
             <div class="text-xs text-red-600">Faltas</div>
           </div>
-          <div class="text-center px-3">
-            <div class="text-xl font-bold">{pendientes}</div>
+          <div class="text-center px-3 py-2 bg-gray-50 rounded-md shadow-sm">
+            <div class="text-2xl font-bold">{pendientes}</div>
             <div class="text-xs text-gray-600">Pendientes</div>
           </div>
-          <button class="bg-blue-600 text-white px-3 py-1 rounded text-sm" onClick={exportCsv}>Exportar CSV</button>
+          <button
+            class="bg-white border border-gray-200 px-3 py-2 rounded-md text-sm hover:shadow-md flex items-center gap-2"
+            onClick={() => {
+              try {
+                const number = '59174325440';
+                const mensaje = `Hola, necesito mi listado de asistencias. Estudiante: ${alumno ? alumno.nombre : ''}`;
+                const url = `https://wa.me/${number}?text=${encodeURIComponent(mensaje)}`;
+                window.open(url, '_blank');
+              } catch (e) {
+                console.warn('No se pudo abrir WhatsApp:', e && e.message);
+              }
+            }}
+            aria-label="Contactar por WhatsApp"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M20.52 3.48A11.91 11.91 0 0012 0C5.373 0 .12 5.253.12 11.88c0 2.09.55 4.14 1.6 5.94L0 24l6.54-1.68A11.86 11.86 0 0012 23.76c6.627 0 11.88-5.253 11.88-11.88 0-3.17-1.24-6.14-3.36-8.4z" fill="#25D366"/>
+              <path d="M17.2 14.14c-.3-.15-1.78-.88-2.06-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.95 1.18-.18.2-.36.22-.67.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.36.45-.54.15-.18.2-.3.3-.5.1-.2 0-.38-.05-.53-.05-.15-.68-1.64-.93-2.25-.24-.58-.49-.5-.68-.51l-.58-.01c-.2 0-.52.07-.8.38-.28.3-1.06 1.04-1.06 2.54s1.08 2.96 1.23 3.17c.15.2 2.12 3.3 5.13 4.63 3.02 1.34 3.02.89 3.57.83.56-.06 1.78-.72 2.03-1.42.25-.7.25-1.3.18-1.42-.07-.12-.27-.2-.57-.35z" fill="#fff"/>
+            </svg>
+            <span class="sr-only">WhatsApp</span>
+          </button>
         </div>
       </div>
-      <div class="mb-3 flex items-center gap-3">
+      <div class="mb-3 flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <label class="text-sm">Estado</label>
-        <select value={estadoFilter} onChange={e => { setEstadoFilter(e.target.value); setPage(1); }} class="border rounded px-2 py-1">
+        <select value={estadoFilter} onChange={e => { setEstadoFilter(e.target.value); setPage(1); }} class="border rounded px-2 py-2 w-full sm:w-auto">
           <option>Todas</option>
           <option>Presente</option>
           <option>Falta</option>
           <option>Pendiente</option>
         </select>
-        <label class="text-sm ml-3">Desde</label>
-        <input type="date" value={fechaFrom} onChange={e => { setFechaFrom(e.target.value.split('-').reverse().join('/')); setPage(1); }} class="border rounded px-2 py-1" />
-        <label class="text-sm ml-3">Hasta</label>
-        <input type="date" value={fechaTo} onChange={e => { setFechaTo(e.target.value.split('-').reverse().join('/')); setPage(1); }} class="border rounded px-2 py-1" />
-        <button class="ml-3 px-2 py-1 border rounded" onClick={() => { setEstadoFilter('Todas'); setFechaFrom(''); setFechaTo(''); setPage(1); }}>Limpiar filtros</button>
+        <button class="ml-0 sm:ml-3 mt-2 sm:mt-0 px-3 py-2 border rounded bg-gray-50 text-sm" onClick={() => { setEstadoFilter('Todas'); setPage(1); }}>Limpiar filtros</button>
       </div>
 
       <div class="mb-3 flex items-center gap-3">
@@ -181,16 +193,16 @@ export default function AlumnoPortal({ apiBaseUrl = '/api' }) {
           {current.map((a, idx) => {
             const globalIndex = meta ? ((meta.page - 1) * meta.pageSize) + (idx + 1) : (idx + 1);
             return (
-              <div key={a.id} class="p-3 border rounded-lg flex items-center justify-between">
-                <div>
-                  <div class="flex items-center gap-3">
+              <div key={a.id} class="p-3 border rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                <div class="w-full sm:w-3/4">
+                  <div class="flex items-center gap-3 mb-1">
                     <div class="text-sm text-gray-500">#{globalIndex}</div>
                     <div class="font-medium">{getWeekdayName(a.fecha)} {a.fecha} · {a.hora}</div>
                   </div>
                   <div class="text-sm text-gray-600">{a.observaciones || '-'}</div>
                 </div>
-                <div class="text-right">
-                  <span class={`px-3 py-1 rounded-full text-sm font-semibold ${a.estado === 'Presente' ? 'bg-green-100 text-green-800' : a.estado === 'Falta' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+                <div class="w-full sm:w-1/4 text-right mt-3 sm:mt-0">
+                  <span class={`inline-block px-3 py-2 rounded-full text-sm font-semibold ${a.estado === 'Presente' ? 'bg-green-100 text-green-800' : a.estado === 'Falta' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
                     {a.estado}
                   </span>
                 </div>

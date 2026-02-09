@@ -53,7 +53,31 @@ export async function GET({ request }) {
     const repo = await resolveRepo();
     const all = await repo.getAsistencias(alumnoId) || [];
     const alumnosRepo = await resolveAlumnosRepo();
-    const alumno = await (alumnosRepo.getById ? alumnosRepo.getById(alumnoId) : null);
+    let alumno = await (alumnosRepo.getById ? alumnosRepo.getById(alumnoId) : null);
+    // If alumno not found, try to resolve from Usuarios (Sheets or mock) and attach _usuario
+    if (!alumno) {
+      try {
+        const useSheets = process.env.USE_GOOGLE_SHEETS === 'true';
+        let usuariosModule;
+        if (useSheets) usuariosModule = await import('../../../../infrastructure/sheets/usuarios.js');
+        else usuariosModule = await import('../../../../infrastructure/mock/index.js');
+        if (usuariosModule && usuariosModule.getUsuarios) {
+          const usuarios = await usuariosModule.getUsuarios();
+          const match = (usuarios || []).find(u => String(u.id_usuario || u.id || '').toLowerCase() === String(alumnoId).toLowerCase());
+          if (match) {
+            alumno = {
+              id: alumnoId,
+              nombre: match.email || match.nombre || '',
+              materias: [],
+              clases_compradas: 0,
+              _usuario: match
+            };
+          }
+        }
+      } catch (e) {
+        // ignore lookup errors
+      }
+    }
 
     // pagination
     const urlObj = new URL(request.url);
@@ -114,7 +138,10 @@ export async function GET({ request }) {
         id: alumno.id || alumno.id_alumno || alumnoId,
         nombre: alumno.nombre || '',
         materias: alumno.materias || [],
-        clases_compradas: alumno.clases_compradas || 0
+        clases_compradas: alumno.clases_compradas || 0,
+        // Preserve the original _usuario object when present so callers
+        // (e.g. admin.astro) can inspect role and other usuario metadata.
+        _usuario: alumno._usuario || null
       } : null
     };
 

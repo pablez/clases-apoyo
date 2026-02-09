@@ -123,7 +123,16 @@ export async function DELETE({ params }) {
   try {
     const repo = await resolveRepoFor(endpoint);
     if (endpoint === 'alumnos' && id && repo.deleteAlumno) {
-      await repo.deleteAlumno(id);
+      const start = Date.now();
+      try {
+        const result = await repo.deleteAlumno(id);
+        const duration = Date.now() - start;
+        console.log(`[API] DELETE /api/alumnos/${id} completed in ${duration}ms, result=`, result);
+      } catch (e) {
+        const duration = Date.now() - start;
+        console.error(`[API] DELETE /api/alumnos/${id} failed in ${duration}ms`, e);
+        throw e;
+      }
       return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 

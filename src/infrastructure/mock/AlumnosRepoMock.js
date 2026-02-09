@@ -16,6 +16,8 @@ function readMock() {
 }
 
 function writeMock(data) {
+  // Avoid mutating the on-disk mock during unit tests to prevent race conditions.
+  if (process.env.NODE_ENV === 'test') return;
   fs.writeFileSync(MOCK_PATH, JSON.stringify(data, null, 2), 'utf8');
 }
 

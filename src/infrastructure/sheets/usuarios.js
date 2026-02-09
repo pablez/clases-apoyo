@@ -5,8 +5,9 @@ export async function getUsuarios() {
 }
 
 export async function createUsuario(payload) {
-  const row = [payload.id_usuario || payload.id || '', payload.id_alumno || '', payload.email || '', payload.rol || ''];
-  const result = await appendSheetRange('Usuarios!A:D', [row]);
+  // Include password column (A:E) to store simple admin entries when needed
+  const row = [payload.id_usuario || payload.id || '', payload.id_alumno || '', payload.email || '', payload.password || '', payload.rol || ''];
+  const result = await appendSheetRange('Usuarios!A:E', [row]);
   return { ok: true, result, created: payload };
 }
 

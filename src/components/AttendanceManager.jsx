@@ -17,7 +17,6 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
   const [currentMonth, setCurrentMonth] = useState(0); // 0-11 para meses de 2026
   const [todasAsistencias, setTodasAsistencias] = useState([]);
   const [showDateDetails, setShowDateDetails] = useState(null); // Fecha seleccionada para ver detalles
-  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     // debug markers removed in production patch
@@ -422,14 +421,6 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
 
   return (
     <div class="space-y-6">
-      <div style={{position: 'fixed', top: '8px', right: '8px', zIndex: 9999}}>
-        <button
-          onClick={() => setShowDebug(s => !s)}
-          class="px-2 py-1 bg-yellow-400 text-black rounded shadow"
-        >
-          {showDebug ? 'Ocultar debug' : 'Mostrar debug'}
-        </button>
-      </div>
       {error && (
         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           {error}
@@ -511,13 +502,8 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
           <div class="flex justify-between items-center mb-3">
             <h3 class="font-semibold">Registro de Asistencia</h3>
             <div class="flex items-center gap-2">
-              <button
-                onClick={() => setShowDebug(s => !s)}
-                class="text-xs text-gray-600 hover:underline"
-              >
-                {showDebug ? 'Ocultar debug' : 'Mostrar debug'}
-              </button>
-            </div>
+                {/* debug toggle removed */}
+              </div>
             {selectedAlumno.clases_compradas > asistencias.length && (
               <button
                 onClick={generarFechasClases}
@@ -780,12 +766,7 @@ export default function AttendanceManager({ apiBaseUrl = '/api' }) {
             </div>
           )}
 
-          {showDebug && (
-            <div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded">
-              <h4 class="text-sm font-semibold mb-2">Debug: asistencias raw</h4>
-              <pre class="text-xs max-h-48 overflow-auto whitespace-pre-wrap">{JSON.stringify(asistencias, null, 2)}</pre>
-            </div>
-          )}
+          {/* debug panel removed */}
           {loading && <p class="text-gray-500">Cargando...</p>}
           
           {!loading && asistencias.length === 0 && (

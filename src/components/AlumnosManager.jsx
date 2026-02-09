@@ -1,70 +1,39 @@
 import { useState, useEffect } from 'preact/hooks';
+import AlumnosForm from './AlumnosForm.jsx';
 
 export default function AlumnosManager({ apiBaseUrl = '/api' }) {
   const [alumnos, setAlumnos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [editingId, setEditingId] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     nombre: '',
     edad: '',
     curso: '',
     telefono_padre: '',
-    email: '',
-    password: '',
-    rol: 'padre',
     materias: '',
     clases_compradas: '',
     horas: '',
-    fecha_proxima: '',
-    hora_proxima: ''
+    email: '',
+    password: '',
+    rol: 'padre'
   });
-
-  useEffect(() => {
-    loadAlumnos();
-  }, []);
-
-  // Listen for calendar assign events (select existing alumno from calendar)
-  useEffect(() => {
-    function onAssign(e) {
-      const detail = e.detail || {};
-      const { alumnoId, date, hour } = detail;
-      // find alumno in current list
-      const found = alumnos.find(a => String(a.id || a.id_alumno) === String(alumnoId));
-      if (found) {
-        editAlumno(found);
-        // prefill next class date/hora if creating/editing
-        let dateForInput = '';
-        if (date && /\d{2}\/\d{2}\/\d{4}/.test(date)) {
-          const [d, m, y] = date.split('/');
-          dateForInput = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-        }
-        setFormData(prev => ({ ...prev, fecha_proxima: dateForInput, hora_proxima: hour || '' }));
-      } else {
-        // If not found, still open create with prefilled date
-        startCreating();
-        let dateForInput = '';
-        if (date && /\d{2}\/\d{2}\/\d{4}/.test(date)) {
-          const [d, m, y] = date.split('/');
-          dateForInput = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-        }
-        setTimeout(() => setFormData(prev => ({ ...prev, fecha_proxima: dateForInput, hora_proxima: hour || '' })), 60);
-      }
-    }
-
-    window.addEventListener('calendar-assign', onAssign);
-    return () => window.removeEventListener('calendar-assign', onAssign);
-  }, [alumnos]);
+  const [formErrors, setFormErrors] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [deletingId, setDeletingId] = useState(null);
 
   async function loadAlumnos() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/alumnos`);
+      // cache-bust to avoid stale Google Sheets eventual consistency
+      const res = await fetch(`${apiBaseUrl}/alumnos?t=${Date.now()}`);
       if (!res.ok) throw new Error('Error al cargar alumnos');
       const data = await res.json();
       setAlumnos(data);
@@ -75,88 +44,62 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
     }
   }
 
+  useEffect(() => {
+    loadAlumnos();
+  }, []);
+
+  function startCreating() {
+    resetForm();
+    setIsCreating(true);
+    setEditingId(null);
+  }
+
+  function editAlumno(alumno) {
+    setFormData({
+      nombre: alumno.nombre || '',
+      edad: alumno.edad || '',
+      curso: alumno.curso || '',
+      telefono_padre: alumno.telefono_padre || '',
+      materias: Array.isArray(alumno.materias) ? alumno.materias.join(', ') : '',
+      clases_compradas: alumno.clases_compradas || '',
+      horas: alumno.horas || '',
+      email: alumno.email || '',
+      password: '',
+      rol: alumno.rol || 'padre'
+    });
+    setEditingId(alumno.id);
+    setIsCreating(false);
+  }
+
   function resetForm() {
     setFormData({
       nombre: '',
       edad: '',
       curso: '',
       telefono_padre: '',
-      email: '',
-      password: '',
-      rol: 'padre',
       materias: '',
       clases_compradas: '',
       horas: '',
-      fecha_proxima: '',
-      hora_proxima: ''
-    });
-    setEditingId(null);
-    setIsCreating(false);
-  }
-
-  // Listen for calendar reservations
-  useEffect(() => {
-    function onReserve(e) {
-      const detail = e.detail || {};
-      const { date, hour } = detail; // date: DD/MM/YYYY, hour: 'HH:MM'
-      startCreating();
-      let dateForInput = '';
-      if (date && /\d{2}\/\d{2}\/\d{4}/.test(date)) {
-        const [d, m, y] = date.split('/');
-        dateForInput = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-      }
-      setTimeout(() => {
-        setFormData(prev => ({ ...prev, fecha_proxima: dateForInput, hora_proxima: hour || '' }));
-        const el = document.getElementById('nombre-input');
-        if (el) el.focus();
-      }, 80);
-    }
-
-    window.addEventListener('calendar-reserve', onReserve);
-    return () => window.removeEventListener('calendar-reserve', onReserve);
-  }, []);
-
-  function startCreating() {
-    resetForm();
-    setIsCreating(true);
-  }
-
-  function editAlumno(alumno) {
-    setEditingId(alumno.id);
-    setIsCreating(false);
-    setFormData({
-      nombre: alumno.nombre || '',
-      edad: alumno.edad || '',
-      curso: alumno.curso || '',
-      telefono_padre: alumno.telefono_padre || '',
       email: '',
       password: '',
-      rol: 'padre',
-      materias: Array.isArray(alumno.materias) ? alumno.materias.join(', ') : '',
-      clases_compradas: alumno.clases_compradas || '',
-      horas: alumno.horas || ''
+      rol: 'padre'
     });
-
-    // Intentar obtener usuario asociado y prefilar email/rol (no bloquear la UI)
-    (async () => {
-      try {
-        const res = await fetch(`${apiBaseUrl}/usuarios`);
-        if (!res.ok) return;
-        const users = await res.json();
-        const found = (users || []).find(u => String(u.id_alumno || (u.alumno && u.alumno.id) || u.alumnoId) === String(alumno.id) || String(u.id_alumno) === String(alumno.id));
-        if (found) {
-          setFormData(prev => ({ ...prev, email: found.email || '', rol: found.rol || prev.rol }));
-        }
-      } catch (e) {
-        // ignore
-      }
-    })();
+    setFormErrors({});
+    setIsCreating(false);
+    setEditingId(null);
   }
 
   async function handleSave() {
-    setError(null);
-    setSuccessMessage('');
     setSaving(true);
+    const errors = {};
+    if (!formData.nombre.trim()) errors.nombre = 'El nombre es obligatorio';
+    if (formData.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(formData.email)) errors.email = 'Email inválido';
+    if (Object.keys(errors).length) {
+      setFormErrors(errors);
+      setSaving(false);
+      return;
+    }
+    setFormErrors({});
     try {
       const payload = {
         ...formData,
@@ -208,6 +151,7 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
     
     setError(null);
     setSaving(true);
+    setDeletingId(id);
     try {
       const res = await fetch(`${apiBaseUrl}/alumnos/${id}`, {
         method: 'DELETE'
@@ -216,14 +160,17 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Error al eliminar alumno');
       }
+      // optimistically remove from UI immediately
+      setAlumnos(prev => prev.filter(a => String(a.id) !== String(id)));
       setSuccessMessage('✅ Alumno eliminado de Google Sheets correctamente');
-      await loadAlumnos();
+      try { await loadAlumnos(); } catch (e) { console.warn('Warning: loadAlumnos after delete failed', e); }
       if (editingId === id) resetForm();
       setTimeout(() => setSuccessMessage(''), 2000);
     } catch (err) {
       setError(err.message);
     } finally {
       setSaving(false);
+      setDeletingId(null);
     }
   }
 
@@ -258,24 +205,47 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
       {/* Lista de Alumnos */}
       <div class="bg-white rounded-lg shadow p-6">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold">Lista de Alumnos</h2>
-          <div class="flex gap-2">
+          <div class="flex-1">
+            <h2 class="text-xl font-bold">Lista de Alumnos</h2>
+            <div class="mt-3 max-w-md">
+              <input
+                type="search"
+                value={searchTerm}
+                onInput={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por nombre, curso o teléfono"
+                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div class="flex gap-2 ml-4">
             <button
               onClick={startCreating}
-              class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2"
             >
-              + Nuevo Alumno
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Nuevo
             </button>
             <button
               onClick={loadAlumnos}
-              class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"
             >
-              ↻ Recargar
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6" />
+              </svg>
+              Recargar
             </button>
           </div>
         </div>
 
-        {loading && <p class="text-gray-500">Cargando...</p>}
+        {loading && (
+          <div class="space-y-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} class="h-8 bg-gray-100 rounded animate-pulse"></div>
+            ))}
+          </div>
+        )}
 
         {!loading && alumnos.length === 0 && (
           <p class="text-gray-500 text-center py-4">No hay alumnos registrados</p>
@@ -299,7 +269,18 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {alumnos.map(alumno => (
+                  {(() => {
+                    const q = searchTerm.trim().toLowerCase();
+                    const filtered = alumnos.filter(a => {
+                      if (!q) return true;
+                      return [a.nombre, a.curso, a.telefono_padre, (a.email||'')].some(v => String(v||'').toLowerCase().includes(q));
+                    });
+                    const total = filtered.length;
+                    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+                    if (page > totalPages) setPage(totalPages);
+                    const start = (page - 1) * pageSize;
+                    const visible = filtered.slice(start, start + pageSize);
+                    return visible.map(alumno => (
                     <tr key={alumno.id} class="border-t hover:bg-gray-50">
                       <td class="px-4 py-2 font-medium">{alumno.nombre}</td>
                       <td class="px-4 py-2">{alumno.edad || 'N/A'}</td>
@@ -315,38 +296,95 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
                       <td class="px-4 py-2 flex gap-2">
                         <button
                           onClick={() => editAlumno(alumno)}
-                          class="text-blue-600 hover:underline text-sm"
+                          class="text-blue-600 hover:underline text-sm flex items-center gap-2"
+                          aria-label={`Editar ${alumno.nombre}`}
+                          disabled={deletingId === alumno.id}
                         >
-                          ✏️ Editar
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5h6M5 7v12a2 2 0 002 2h10a2 2 0 002-2V7" />
+                          </svg>
+                          Editar
                         </button>
                         <button
                           onClick={() => handleDelete(alumno.id)}
-                          class="text-red-600 hover:underline text-sm"
+                          class="text-red-600 hover:underline text-sm flex items-center gap-2"
+                          aria-label={`Eliminar ${alumno.nombre}`}
+                          disabled={deletingId === alumno.id}
                         >
-                          🗑️ Eliminar
+                          {deletingId === alumno.id ? (
+                            <>
+                              <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Eliminando...
+                            </>
+                          ) : (
+                            <>
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              Eliminar
+                            </>
+                          )}
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
 
+            {/* Pagination controls */}
+            <div class="mt-4 flex items-center justify-between">
+              <div class="text-sm text-gray-600">
+                {(() => {
+                  const q = searchTerm.trim().toLowerCase();
+                  const total = alumnos.filter(a => {
+                    if (!q) return true;
+                    return [a.nombre, a.curso, a.telefono_padre, (a.email||'')].some(v => String(v||'').toLowerCase().includes(q));
+                  }).length;
+                  const start = (page - 1) * pageSize + 1;
+                  const end = Math.min(total, page * pageSize);
+                  return `Mostrando ${start}-${end} de ${total}`;
+                })()}
+              </div>
+              <div class="flex items-center gap-2">
+                <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} class="px-2 py-1 border rounded">
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                </select>
+                <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Anterior</button>
+                <button onClick={() => setPage(p => p + 1)} class="px-3 py-1 bg-gray-200 rounded">Siguiente</button>
+              </div>
+            </div>
+
             {/* Mobile: tarjetas compactas */}
             <div class="block sm:hidden space-y-3">
-              {alumnos.map(alumno => (
+              {alumnos
+                .filter(a => {
+                  const q = searchTerm.trim().toLowerCase();
+                  if (!q) return true;
+                  return [a.nombre, a.curso, a.telefono_padre, (a.email||'')].some(v => String(v||'').toLowerCase().includes(q));
+                })
+                .map(alumno => (
                 <div key={alumno.id} class="bg-white rounded-lg shadow p-3 border">
                   <div class="flex justify-between items-start gap-3">
                     <div class="flex-1 min-w-0">
                       <div class="text-base font-semibold truncate">{alumno.nombre}</div>
                       <div class="text-xs text-gray-500 truncate">{alumno.curso || 'N/A'} · {alumno.edad || 'N/A'} años</div>
                       <div class="text-xs text-gray-500 mt-1 truncate">{alumno.telefono_padre || 'N/A'}</div>
+                      <div class="text-xs text-gray-500 mt-1 truncate">{alumno.email || '—'} · {alumno.rol || 'padre'}</div>
                     </div>
                     <div class="flex flex-col items-end gap-2">
                       <div class="text-sm font-medium text-gray-700">{alumno.clases_compradas || 0} clases</div>
-                      <div class="flex gap-2">
-                        <button onClick={() => editAlumno(alumno)} class="px-3 py-1 bg-blue-600 text-white rounded text-xs">✏️</button>
-                        <button onClick={() => handleDelete(alumno.id)} class="px-3 py-1 bg-red-600 text-white rounded text-xs">🗑️</button>
+                        <div class="flex gap-2">
+                        <button onClick={() => editAlumno(alumno)} class="px-3 py-1 bg-blue-600 text-white rounded text-xs" disabled={deletingId === alumno.id}>✏️</button>
+                        <button onClick={() => handleDelete(alumno.id)} class="px-3 py-1 bg-red-600 text-white rounded text-xs" disabled={deletingId === alumno.id}>
+                          {deletingId === alumno.id ? '...' : '🗑️'}
+                        </button>
                       </div>
                       <button onClick={() => setExpandedId(expandedId === alumno.id ? null : alumno.id)} class="text-xs text-gray-500 mt-1">
                         {expandedId === alumno.id ? 'Ocultar' : 'Ver más'}
@@ -377,24 +415,6 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
             {(isCreating || editingId) && (
               <>
                 <div>
-                  <label class="block text-sm font-medium mb-1">Fecha primera clase</label>
-                  <input
-                    type="date"
-                    value={formData.fecha_proxima}
-                    onInput={(e) => setFormData({ ...formData, fecha_proxima: e.target.value })}
-                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1">Hora preferida</label>
-                  <input
-                    type="time"
-                    value={formData.hora_proxima}
-                    onInput={(e) => setFormData({ ...formData, hora_proxima: e.target.value })}
-                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
                   <label class="block text-sm font-medium mb-1">Email (usuario)</label>
                   <input
                     type="email"
@@ -423,7 +443,6 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
                   >
                     <option value="padre">padre</option>
                     <option value="alumno">alumno</option>
-                    <option value="admin">admin</option>
                   </select>
                 </div>
               </>
@@ -435,9 +454,12 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
                 type="text"
                 value={formData.nombre}
                 onInput={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                class={`w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 ${formErrors.nombre ? 'border-red-500' : ''}`}
                 placeholder="Nombre completo"
+                aria-invalid={formErrors.nombre ? 'true' : 'false'}
+                aria-describedby={formErrors.nombre ? 'error-nombre' : undefined}
               />
+              {formErrors.nombre && <p id="error-nombre" class="text-sm text-red-600 mt-1">{formErrors.nombre}</p>}
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">Edad</label>
@@ -516,12 +538,16 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              {saving ? 'Guardando...' : (isCreating ? '💾 Crear' : '💾 Guardar Cambios')}
+              {!saving && (
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {saving ? 'Guardando...' : (isCreating ? 'Crear' : 'Guardar Cambios')}
             </button>
             <button
               onClick={resetForm}
-              disabled={saving}
-              class="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-50"
+              class="px-6 py-2 rounded font-medium bg-gray-400 hover:bg-gray-500 text-white"
             >
               Cancelar
             </button>

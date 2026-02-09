@@ -5,16 +5,28 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const mockPath = path.resolve(__dirname, '../../data/mock.json');
 
+const IS_TEST = process.env.NODE_ENV === 'test';
+let MEM = null;
+
 async function readMock() {
+  if (IS_TEST && MEM) return MEM;
   try {
     const txt = await fs.readFile(mockPath, 'utf-8');
-    return JSON.parse(txt);
+    const parsed = JSON.parse(txt);
+    if (IS_TEST) MEM = parsed;
+    return parsed;
   } catch (e) {
-    return { alumnos: [], asistencias: [], materiales: [], usuarios: [] };
+    const empty = { alumnos: [], asistencias: [], materiales: [], usuarios: [] };
+    if (IS_TEST) MEM = empty;
+    return empty;
   }
 }
 
 async function writeMock(data) {
+  if (IS_TEST) {
+    MEM = data;
+    return;
+  }
   await fs.mkdir(path.dirname(mockPath), { recursive: true });
   await fs.writeFile(mockPath, JSON.stringify(data, null, 2), 'utf-8');
 }
@@ -69,6 +81,9 @@ export async function deleteAlumno(id) {
   mock.alumnos = list;
   if (mock.asistencias && Array.isArray(mock.asistencias)) {
     mock.asistencias = mock.asistencias.filter(a => String(a.alumnoId || a.id_alumno || a.alumno) !== String(id));
+  }
+  if (mock.usuarios && Array.isArray(mock.usuarios)) {
+    mock.usuarios = mock.usuarios.filter(u => String(u.id_alumno || u.alumnoId || u.alumno) !== String(id));
   }
   await writeMock(mock);
   return { success: true };

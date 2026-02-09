@@ -96,4 +96,64 @@ export async function updateAlumno(id, payload) {
   return { id: String(id), ...payload };
 }
 
+export async function deleteAlumno(id) {
+  // Leer todas las filas para localizar la fila del alumno y reescribir la hoja sin esa fila
+  const alumnosRange = 'Alumnos!A1:H100';
+  const alumnosRows = await readSheetRange(alumnosRange);
+  if (!alumnosRows || alumnosRows.length === 0) throw new Error('Alumnos sheet empty');
+
+  const alumnosHeaders = alumnosRows[0];
+  const alumnosBody = alumnosRows.slice(1);
+  const idx = alumnosBody.findIndex(r => String(r[0] || r[0]) === String(id) || String(r[0]) === String(id));
+  if (idx === -1) throw new Error('Alumno no encontrado');
+
+  // Remove the alumno row
+  alumnosBody.splice(idx, 1);
+  const newAlumnosRows = [alumnosHeaders, ...alumnosBody];
+  // Pad to original length to ensure rows below are cleared
+  const originalAlumnosLen = alumnosRows.length;
+  while (newAlumnosRows.length < originalAlumnosLen) {
+    newAlumnosRows.push(new Array(alumnosHeaders.length).fill(''));
+  }
+  await updateSheetRange(`Alumnos!A1:H${originalAlumnosLen}`, newAlumnosRows);
+
+  // Eliminar asistencias asociadas (Asistencias!A1:F100)
+  try {
+    const asisRange = 'Asistencias!A1:F100';
+    const asisRows = await readSheetRange(asisRange);
+    if (asisRows && asisRows.length > 0) {
+      const asisHeaders = asisRows[0];
+      const asisBody = asisRows.slice(1).filter(r => String(r[1]) !== String(id));
+      const newAsisRows = [asisHeaders, ...asisBody];
+      const originalAsisLen = asisRows.length;
+      while (newAsisRows.length < originalAsisLen) {
+        newAsisRows.push(new Array(asisHeaders.length).fill(''));
+      }
+      await updateSheetRange(`Asistencias!A1:F${originalAsisLen}`, newAsisRows);
+    }
+  } catch (e) {
+    console.warn('No se pudo eliminar asistencias del alumno:', e.message);
+  }
+
+  // Eliminar usuario asociado en hoja Usuarios (Usuarios!A1:E100)
+  try {
+    const usuariosRange = 'Usuarios!A1:E100';
+    const usuariosRows = await readSheetRange(usuariosRange);
+    if (usuariosRows && usuariosRows.length > 0) {
+      const usuariosHeaders = usuariosRows[0];
+      const usuariosBody = usuariosRows.slice(1).filter(r => String(r[1]) !== String(id));
+      const newUsuariosRows = [usuariosHeaders, ...usuariosBody];
+      const originalUsuariosLen = usuariosRows.length;
+      while (newUsuariosRows.length < originalUsuariosLen) {
+        newUsuariosRows.push(new Array(usuariosHeaders.length).fill(''));
+      }
+      await updateSheetRange(`Usuarios!A1:E${originalUsuariosLen}`, newUsuariosRows);
+    }
+  } catch (e) {
+    console.warn('No se pudo eliminar usuario asociado al alumno:', e.message);
+  }
+
+  return { success: true };
+}
+
 export default { getAlumnos, createAlumno, updateAlumno };

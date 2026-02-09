@@ -3,13 +3,25 @@
 <nav class="bg-white shadow">
   <div class="container mx-auto px-4 py-4 flex items-center justify-between">
     <a href="/" class="text-xl font-bold">Clases de Apoyo</a>
-    <div class="space-x-4">
+    <div class="hidden md:flex items-center space-x-4">
       <a href="/" class="text-sm text-gray-700 hover:underline">Inicio</a>
       <a href="/materiales" class="text-sm text-gray-700 hover:underline">Materiales</a>
-      <a href="/admin" class="text-sm text-gray-700 hover:underline">Admin</a>
+      
       <a id="nav-auth-link" href="/login" class="text-sm text-gray-700 hover:underline">Iniciar sesión</a>
       <span id="nav-auth-status" class="text-sm text-gray-500 ml-2"></span>
     </div>
+    <div class="md:hidden flex items-center">
+      <button id="nav-toggle" aria-label="Abrir menú" class="p-2 rounded-md focus:outline-none focus:ring">
+        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+      </button>
+    </div>
+  </div>
+  <div id="nav-mobile" class="md:hidden hidden px-4 pb-4">
+    <a href="/" class="block text-sm text-gray-700 py-2">Inicio</a>
+    <a href="/materiales" class="block text-sm text-gray-700 py-2">Materiales</a>
+    
+    <a id="nav-auth-link-mobile" href="/login" class="block text-sm text-gray-700 py-2">Iniciar sesión</a>
+    <div id="nav-auth-status-mobile" class="text-sm text-gray-500 py-2"></div>
   </div>
 </nav>
 <script>
@@ -17,60 +29,135 @@
       // client page probe removed (debugging endpoint disabled)
     try{
         // Avoid probing the protected endpoint when there's clearly no auth token or session cookie
-        let hasToken = false;
-        try { hasToken = !!(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')); } catch(e) { hasToken = false; }
-        const cookieStr = (document && document.cookie) ? document.cookie : '';
-        const hasSessionCookie = cookieStr.includes('session=');
-        let el = document.getElementById('nav-auth-link');
-        let container = el ? el.parentElement : null;
-        if (!hasToken && !hasSessionCookie) {
-          if (el) { el.href = '/login'; el.textContent = 'Iniciar sesión'; }
-          // ensure logout button removed
-          const logout = document.getElementById('nav-logout-btn'); if (logout) logout.remove();
-          return;
+      let hasToken = false;
+      try { hasToken = !!(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')); } catch(e) { hasToken = false; }
+      const cookieStr = (document && document.cookie) ? document.cookie : '';
+      const hasSessionCookie = cookieStr.includes('session=');
+      let el = document.getElementById('nav-auth-link');
+      let elMobile = document.getElementById('nav-auth-link-mobile');
+      let container = el ? el.parentElement : null;
+      if (!hasToken && !hasSessionCookie) {
+        if (el) { el.href = '/login'; el.textContent = 'Iniciar sesión'; }
+        if (elMobile) { elMobile.href = '/login'; elMobile.textContent = 'Iniciar sesión'; }
+        // ensure logout button removed
+        const logout = document.getElementById('nav-logout-btn'); if (logout) logout.remove();
+        // Ensure mobile toggle behavior is attached even when not authenticated
+        const toggleUnauth = document.getElementById('nav-toggle');
+        const mobileUnauth = document.getElementById('nav-mobile');
+        if (toggleUnauth && mobileUnauth) {
+          toggleUnauth.onclick = function() { mobileUnauth.classList.toggle('hidden'); };
         }
+        return;
+      }
 
-        // Prefer Authorization token from localStorage (set on login), fallback to cookie
-        let init = { credentials: 'include' };
-        try {
-          const t = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-          if (t) init = { headers: { Authorization: `Bearer ${t}` } };
-        } catch(e){}
-        const resp = await fetch('/api/alumno/asistencias', init);
-      // reuse existing `el`/`container` variables
-      el = el || document.getElementById('nav-auth-link');
-      const statusEl = document.getElementById('nav-auth-status');
-      if (!el) return;
-      container = container || el.parentElement;
-      if (resp.ok) {
-        el.href = '/alumno';
-        el.textContent = 'Ver asistencia';
-        try {
-          const body = await resp.json();
-          if (statusEl) statusEl.textContent = body && body.alumno && body.alumno.nombre ? `Conectado como ${body.alumno.nombre}` : '';
-        } catch(e) { if (statusEl) statusEl.textContent = ''; }
-        // add logout button if not present
-        if (!document.getElementById('nav-logout-btn')) {
+      // If an admin session flag was set by the admin panel, prefer that and show admin panel link
+      let isAdmin = false;
+      try { isAdmin = sessionStorage.getItem('admin_auth') === 'true' || localStorage.getItem('admin_auth') === 'true'; } catch(e) { isAdmin = false; }
+      if (isAdmin) {
+        el = el || document.getElementById('nav-auth-link');
+        elMobile = elMobile || document.getElementById('nav-auth-link-mobile');
+        if (el) { el.href = '/admin'; el.textContent = 'Panel de admin'; }
+        if (elMobile) { elMobile.href = '/admin'; elMobile.textContent = 'Panel de admin'; }
+        // show logout button
+        const containerLocal = el ? el.parentElement : null;
+        if (containerLocal && !document.getElementById('nav-logout-btn')) {
           const btn = document.createElement('button');
           btn.id = 'nav-logout-btn';
           btn.className = 'ml-2 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700';
           btn.textContent = 'Cerrar sesión';
           btn.onclick = async function () {
-            try {
-              await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-            } catch(e) {}
+            try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch(e){}
+            try { localStorage.removeItem('auth_token'); sessionStorage.removeItem('auth_token'); sessionStorage.removeItem('admin_auth'); localStorage.removeItem('admin_auth'); } catch(e){}
             window.location.href = '/';
           };
-          container.appendChild(btn);
+          containerLocal.appendChild(btn);
         }
-      } else {
-        el.href = '/login';
-        el.textContent = 'Iniciar sesión';
-        if (statusEl) statusEl.textContent = '';
-        // remove logout if present
-        const logout = document.getElementById('nav-logout-btn');
-        if (logout) logout.remove();
+        const mobileContainer = document.getElementById('nav-mobile');
+        if (mobileContainer && !document.getElementById('nav-logout-btn-mobile')) {
+          const btnm = document.createElement('button');
+          btnm.id = 'nav-logout-btn-mobile';
+          btnm.className = 'w-full text-left mt-2 bg-red-600 text-white px-3 py-2 rounded text-sm hover:bg-red-700';
+          btnm.textContent = 'Cerrar sesión';
+          btnm.onclick = async function () { try{ await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); }catch(e){} try{ localStorage.removeItem('auth_token'); sessionStorage.removeItem('auth_token'); sessionStorage.removeItem('admin_auth'); localStorage.removeItem('admin_auth'); }catch(e){} window.location.href = '/'; };
+          mobileContainer.appendChild(btnm);
+        }
+        // ensure toggle behavior is present
+        const toggle = document.getElementById('nav-toggle');
+        const mobile = document.getElementById('nav-mobile');
+        if (toggle && mobile) toggle.onclick = function() { mobile.classList.toggle('hidden'); };
+        return;
       }
-    }catch(e){ /* ignore */ }
+
+      // Prefer Authorization token from localStorage (set on login), fallback to cookie
+      let init = { credentials: 'include' };
+      try {
+        const t = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+        if (t) init = { headers: { Authorization: `Bearer ${t}` } };
+      } catch(e){}
+      const resp = await fetch('/api/alumno/asistencias', init);
+    // reuse existing `el`/`container` variables
+    el = el || document.getElementById('nav-auth-link');
+    elMobile = elMobile || document.getElementById('nav-auth-link-mobile');
+    const statusEl = document.getElementById('nav-auth-status');
+    const statusElMobile = document.getElementById('nav-auth-status-mobile');
+    if (!el) return;
+    container = container || el.parentElement;
+    if (resp.ok) {
+      el.href = '/alumno';
+      el.textContent = 'Ver asistencia';
+      if (elMobile) { elMobile.href = '/alumno'; elMobile.textContent = 'Ver asistencia'; }
+      try {
+        const body = await resp.json();
+        if (statusEl) statusEl.textContent = body && body.alumno && body.alumno.nombre ? `Conectado como ${body.alumno.nombre}` : '';
+        if (statusElMobile) statusElMobile.textContent = body && body.alumno && body.alumno.nombre ? `Conectado como ${body.alumno.nombre}` : '';
+      } catch(e) { if (statusEl) statusEl.textContent = ''; }
+      // add logout button if not present (desktop)
+      if (!document.getElementById('nav-logout-btn')) {
+        const btn = document.createElement('button');
+        btn.id = 'nav-logout-btn';
+        btn.className = 'ml-2 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700';
+        btn.textContent = 'Cerrar sesión';
+        btn.onclick = async function () {
+          try {
+            await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+          } catch(e) {}
+          try { localStorage.removeItem('auth_token'); sessionStorage.removeItem('auth_token'); } catch(e) {}
+          window.location.href = '/';
+        };
+        container.appendChild(btn);
+      }
+      // also ensure mobile logout added inside mobile container
+      const mobileContainer = document.getElementById('nav-mobile');
+      if (mobileContainer && !document.getElementById('nav-logout-btn-mobile')) {
+        const btnm = document.createElement('button');
+        btnm.id = 'nav-logout-btn-mobile';
+        btnm.className = 'w-full text-left mt-2 bg-red-600 text-white px-3 py-2 rounded text-sm hover:bg-red-700';
+        btnm.textContent = 'Cerrar sesión';
+        btnm.onclick = async function () {
+          try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch(e) {}
+          try { localStorage.removeItem('auth_token'); sessionStorage.removeItem('auth_token'); } catch(e) {}
+          window.location.href = '/';
+        };
+        mobileContainer.appendChild(btnm);
+      }
+    } else {
+      el.href = '/login';
+      el.textContent = 'Iniciar sesión';
+      if (elMobile) { elMobile.href = '/login'; elMobile.textContent = 'Iniciar sesión'; }
+      if (statusEl) statusEl.textContent = '';
+      if (statusElMobile) statusElMobile.textContent = '';
+      // remove logout if present
+      const logout = document.getElementById('nav-logout-btn');
+      if (logout) logout.remove();
+      const logoutm = document.getElementById('nav-logout-btn-mobile');
+      if (logoutm) logoutm.remove();
+    }
+    // mobile toggle behavior
+    const toggle = document.getElementById('nav-toggle');
+    const mobile = document.getElementById('nav-mobile');
+    if (toggle && mobile) {
+      toggle.onclick = function() { mobile.classList.toggle('hidden'); };
+    }
+  }catch(e){ /* ignore */ }
   })();
 </script>

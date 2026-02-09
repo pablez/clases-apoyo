@@ -39,15 +39,27 @@ export default class AlumnosRepoSheets {
     try {
       const usuarios = await readUsuarios();
       const match = (usuarios || []).find(u => (u.email && String(u.email) === String(email)));
-      if (match && (match.id_alumno || match.id)) {
-        const alumnoId = match.id_alumno || match.id;
-        const alumno = await this.getById(alumnoId);
-        if (alumno) {
-          // Adjuntar información del usuario (email/rol/password) para verificación
-          alumno._usuario = match;
-          alumno.password = match.password || match.contraseña || match.pass || '';
-          return alumno;
+      if (match) {
+        if (match.id_alumno || match.id) {
+          const alumnoId = match.id_alumno || match.id;
+          const alumno = await this.getById(alumnoId);
+          if (alumno) {
+            // Adjuntar información del usuario (email/rol/password) para verificación
+            alumno._usuario = match;
+            alumno.password = match.password || match.contraseña || match.pass || '';
+            return alumno;
+          }
         }
+        // If Usuarios entry exists but doesn't reference an alumno, return a synthetic alumno-like object
+        const synthetic = {
+          id: match.id_usuario || `u_${Date.now()}`,
+          nombre: match.email || 'Admin',
+          materias: [],
+          clases_compradas: 0,
+          _usuario: match,
+          password: match.password || match.contraseña || match.pass || ''
+        };
+        return synthetic;
       }
     } catch (e) {
       // Si falla la lectura de Usuarios, seguimos con la búsqueda directa en Alumnos

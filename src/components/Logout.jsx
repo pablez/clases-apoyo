@@ -9,6 +9,7 @@ export default function Logout({ apiBaseUrl = '/api' }) {
       } catch (e) {
         // ignore
       } finally {
+        try { localStorage.removeItem('auth_token'); sessionStorage.removeItem('auth_token'); } catch (e) {}
         window.location.href = '/';
       }
     }
