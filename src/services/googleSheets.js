@@ -228,7 +228,7 @@ export async function readAllData() {
   const [rowsAlumnos, rowsAsistencias, rowsMateriales] = await Promise.all([
     readSheetRange('Alumnos!A1:H100'),
     readSheetRange('Asistencias!A1:F100'),
-    readSheetRange('Materiales!A1:F100'),
+    readSheetRange('Materiales!A1:H100'),
   ]);
 
   const data = {
@@ -260,9 +260,9 @@ export async function readAllData() {
  * const rowsAsis = await readSheetRange('Asistencias!A1:F100');
  * const asistencias = rowsToObjects(rowsAsis);
  * 
- * // HOJA "Materiales" (A1:F100)
- * // Columnas: id_material, materia, titulo, descripcion, url_recurso, imagen_url
- * const rowsMat = await readSheetRange('Materiales!A1:F100');
+ * // HOJA "Materiales" (A1:H100)
+ * // Columnas: id_material, materia, nivel, grado, titulo, descripcion, url_recurso, imagen_url
+ * const rowsMat = await readSheetRange('Materiales!A1:H100');
  * const materiales = rowsToObjects(rowsMat);
  * 
  * // Actualizar un estado de asistencia en la fila 5, columna E

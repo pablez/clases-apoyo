@@ -45,8 +45,21 @@ export default function AlumnoPortal({ apiBaseUrl = '/api' }) {
           estado: a.estado,
           observaciones: a.observaciones || a.observacion || ''
         }));
-        // sort desc by fecha
-        normalized.sort((x, y) => (x.fecha < y.fecha ? 1 : -1));
+        // sort ascending by fecha (día, mes, año) — convierte 'DD/MM/YY' o 'DD/MM/YYYY' a Date
+        function parseFecha(fechaStr) {
+          if (!fechaStr) return 0;
+          const parts = fechaStr.split('/');
+          if (parts.length !== 3) return 0;
+          const day = Number(parts[0]);
+          const month = Number(parts[1]);
+          let year = Number(parts[2]);
+          if (year < 100) year += 2000;
+          const d = new Date(year, month - 1, day);
+          return isNaN(d.getTime()) ? 0 : d.getTime();
+        }
+
+        // ordenar ascendente (más antiguo -> más reciente). Para invertir, cambiar b - a.
+        normalized.sort((a, b) => parseFecha(a.fecha) - parseFecha(b.fecha));
         setAsistencias(normalized);
       } catch (e) {
         setError(e.message);

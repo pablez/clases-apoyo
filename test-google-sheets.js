@@ -94,17 +94,17 @@ async function testGoogleSheets() {
     console.log('✅ Hoja "Alumnos" leída correctamente');
     console.log('📋 Datos:', responseAlumnos.data.values);
     
-    // 4. Probar lectura de la hoja Materiales
+    // 4. Probar lectura de la hoja Materiales (ahora con columnas A..H)
     console.log('\n📊 Intentando leer hoja "Materiales"...');
     try {
       const responseMateriales = await sheets.spreadsheets.values.get({
         spreadsheetId: process.env.GOOGLE_SHEET_ID,
-        range: 'Materiales!A1:F10',
+        range: 'Materiales!A1:H10',
       });
       
       if (!responseMateriales.data.values || responseMateriales.data.values.length === 0) {
         console.log('⚠️  La hoja "Materiales" existe pero está VACÍA');
-        console.log('💡 Agrega headers: id | materia | titulo | descripcion | url_recurso | imagen_url');
+        console.log('💡 Agrega headers: id | materia | nivel | grado | titulo | descripcion | url_recurso | imagen_url');
       } else {
         console.log('✅ Hoja "Materiales" leída correctamente');
         console.log('📋 Headers:', responseMateriales.data.values[0]);

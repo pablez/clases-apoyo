@@ -1,257 +1,197 @@
-import { useState, useEffect } from 'preact/hooks';
-import LoadingSpinner from './LoadingSpinner.jsx';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 
 export default function MaterialesPublic({ apiBaseUrl = '/api' }) {
-  const [materiales, setMateriales] = useState([]);
+  const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedMateria, setSelectedMateria] = useState('Todas');
-  const [retryCount, setRetryCount] = useState(0);
-  const [diagnostics, setDiagnostics] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
 
-  const materias = ['Todas', 'Matemáticas', 'Física', 'Química', 'Programación'];
+  const [selectedMateria, setSelectedMateria] = useState('Todas');
+  const [selectedNivel, setSelectedNivel] = useState('Todos');
+  const [selectedGrado, setSelectedGrado] = useState('Todos');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
-    checkHealth();
     loadMateriales();
   }, []);
-
-  async function checkHealth() {
-    try {
-      const res = await fetch(`${apiBaseUrl}/health`, {
-        signal: AbortSignal.timeout(5000)
-      });
-      const data = await res.json();
-      console.log('🏥 Health check:', data);
-      setDiagnostics(data);
-    } catch (err) {
-      console.error('❌ Health check failed:', err);
-    }
-  }
 
   async function loadMateriales() {
     setLoading(true);
     setError(null);
-    
     try {
-      console.log('🔄 Cargando materiales desde:', `${apiBaseUrl}/materiales`);
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
-      
-      const res = await fetch(`${apiBaseUrl}/materiales`, {
-        signal: controller.signal,
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      console.log('📡 Respuesta recibida:', res.status, res.statusText);
-      
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(`Error ${res.status}: ${errorData.error || res.statusText}`);
-      }
-      
+      const res = await fetch(`${apiBaseUrl}/materiales`);
+      if (!res.ok) throw new Error('Error al cargar materiales');
       const data = await res.json();
-      console.log('✅ Materiales cargados:', data.length);
-      console.log('📦 Datos:', data);
-      
-      setMateriales(data);
-      setRetryCount(0);
+      const list = Array.isArray(data) ? data : (data.value || data.materiales || []);
+      setMaterials(list || []);
     } catch (err) {
-      console.error('❌ Error al cargar materiales:', err);
-      
-      let errorMessage = err.message;
-      
-      if (err.name === 'AbortError') {
-        errorMessage = 'La petición tardó demasiado. Verifica tu conexión a internet.';
-      } else if (err.message.includes('Failed to fetch')) {
-        errorMessage = 'No se pudo conectar con el servidor. Verifica que la API esté funcionando.';
-      }
-      
-      setError(errorMessage);
+      setError(err.message || String(err));
     } finally {
       setLoading(false);
     }
   }
 
-  function retry() {
-    setRetryCount(prev => prev + 1);
-    loadMateriales();
-  }
+  const materias = useMemo(() => ['Todas', ...Array.from(new Set(materials.map(m => (m.materia || '').trim()).filter(Boolean)))], [materials]);
+  const niveles = useMemo(() => ['Todos', ...Array.from(new Set(materials.map(m => (m.nivel || '').trim()).filter(Boolean)))], [materials]);
+  const grados = useMemo(() => ['Todos', ...Array.from(new Set(materials.map(m => (m.grado || '').trim()).filter(Boolean)))], [materials]);
 
-  const filteredMateriales = selectedMateria === 'Todas'
-    ? materiales
-    : materiales.filter(m => m.materia === selectedMateria);
+  const filtered = useMemo(() => {
+    const q = String(query || '').toLowerCase().trim();
+    return materials.filter(m => {
+      if (selectedMateria && selectedMateria !== 'Todas' && (m.materia || '') !== selectedMateria) return false;
+      if (selectedNivel && selectedNivel !== 'Todos' && (m.nivel || '') !== selectedNivel) return false;
+      if (selectedGrado && selectedGrado !== 'Todos' && (m.grado || '') !== selectedGrado) return false;
+      if (!q) return true;
+      const inTitle = (m.titulo || '').toLowerCase().includes(q);
+      const inDesc = (m.descripcion || '').toLowerCase().includes(q);
+      const inMateria = (m.materia || '').toLowerCase().includes(q);
+      return inTitle || inDesc || inMateria;
+    });
+  }, [materials, selectedMateria, selectedNivel, selectedGrado, query]);
 
-  if (loading) {
-    return (
-      <div class="space-y-6">
-        <LoadingSpinner message="Cargando materiales educativos..." size="large" />
-        
-        {/* Skeleton Cards */}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => (
-            <div key={i} class="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
-              <div class="h-48 bg-gray-200"></div>
-              <div class="p-6 space-y-3">
-                <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div class="h-4 bg-gray-200 rounded"></div>
-                <div class="h-4 bg-gray-200 rounded w-5/6"></div>
-              </div>
-            </div>
-          ))}
+  if (loading) return (
+    <div class="py-12">
+      <div class="max-w-6xl mx-auto px-4">
+        <div class="animate-pulse space-y-4">
+          <div class="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} class="h-40 bg-white rounded shadow p-4"></div>
+            ))}
+          </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div class="text-center py-12">
-        <div class="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
-          <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold text-gray-800 mb-2">Error al cargar materiales</h3>
-        <p class="text-gray-600 mb-4 max-w-md mx-auto">{error}</p>
-        
-        {diagnostics && (
-          <details class="text-left max-w-2xl mx-auto mb-4 bg-gray-50 rounded-lg p-4">
-            <summary class="cursor-pointer font-medium text-gray-700 mb-2">
-              🔍 Información de diagnóstico (clic para ver)
-            </summary>
-            <pre class="text-xs overflow-auto bg-white p-3 rounded border">
-              {JSON.stringify(diagnostics, null, 2)}
-            </pre>
-          </details>
-        )}
-        
-        <div class="flex gap-3 justify-center">
-          <button
-            onClick={retry}
-            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition inline-flex items-center gap-2"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-            {retryCount > 0 ? `Reintentar (${retryCount})` : 'Reintentar'}
-          </button>
-          
-          <a
-            href={`${apiBaseUrl}/health`}
-            target="_blank"
-            class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition inline-flex items-center gap-2"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            Ver Health Check
-          </a>
-        </div>
-      </div>
-    );
-  }
+  if (error) return (
+    <div class="py-8 text-center">
+      <p class="text-red-600">Error al cargar materiales: {error}</p>
+      <button onClick={loadMateriales} class="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Reintentar</button>
+    </div>
+  );
 
   return (
-    <div class="space-y-6">
-      {/* Filtros */}
-      <div class="mb-8 flex gap-3 flex-wrap items-center">
-        <span class="text-sm font-medium text-gray-700">Filtrar por:</span>
-        {materias.map(materia => (
-          <button
-            key={materia}
-            onClick={() => setSelectedMateria(materia)}
-            class={`px-4 py-2 rounded-lg border-2 transition-all transform hover:scale-105 ${
-              selectedMateria === materia
-                ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                : 'border-gray-200 hover:border-gray-300 text-gray-700'
-            }`}
-          >
-            {materia}
-          </button>
-        ))}
-      </div>
-
-      {/* Contador */}
-      <div class="text-sm text-gray-600">
-        Mostrando <span class="font-bold text-blue-600">{filteredMateriales.length}</span> {filteredMateriales.length === 1 ? 'material' : 'materiales'}
-        {selectedMateria !== 'Todas' && <span> de {selectedMateria}</span>}
-      </div>
-
-      {/* Lista de materiales */}
-      {filteredMateriales.length === 0 ? (
-        <div class="text-center py-12 bg-gray-50 rounded-lg">
-          <div class="inline-flex items-center justify-center w-16 h-16 bg-gray-200 rounded-full mb-4">
-            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-            </svg>
+    <section class="py-8">
+      <div class="max-w-6xl mx-auto px-4">
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-2xl sm:text-3xl font-bold">Materiales</h2>
+            <div class="flex items-center gap-2">
+              <button
+                onClick={() => setShowFilters(s => !s)}
+                class="md:hidden px-3 py-2 bg-blue-600 text-white rounded-lg shadow-md"
+                aria-expanded={showFilters}
+                aria-controls="filters-panel"
+              >
+                {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
+              </button>
+              <button onClick={() => { setQuery(''); setSelectedMateria('Todas'); setSelectedNivel('Todos'); setSelectedGrado('Todos'); }} class="hidden md:inline-block px-3 py-2 bg-gray-100 rounded">Limpiar</button>
+            </div>
           </div>
-          <p class="text-gray-500 text-lg">No hay materiales disponibles</p>
-          <p class="text-sm text-gray-400 mt-2">
-            {selectedMateria !== 'Todas' 
-              ? `Intenta seleccionar otra materia` 
-              : 'Vuelve pronto para encontrar nuevos recursos'}
-          </p>
-        </div>
-      ) : (
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredMateriales.map(material => (
-            <div key={material.id} class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
-              {material.imagen_url && (
-                <div class="h-48 overflow-hidden bg-gray-100">
-                  <img 
-                    src={material.imagen_url} 
-                    alt={material.titulo}
-                    class="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.parentElement.innerHTML = '<div class="flex items-center justify-center h-full bg-gradient-to-br from-blue-100 to-blue-50"><svg class="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg></div>';
-                    }}
+
+          <div id="filters-panel" class={`w-full transition-all duration-200 ${showFilters ? 'block' : 'hidden'} md:block`}>
+            <div class="flex flex-col gap-3 w-full">
+              <div class="flex items-center gap-3 w-full">
+                <div class="relative flex-1">
+                  <input
+                    value={query}
+                    onInput={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar título, descripción o materia"
+                    class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    aria-label="Buscar materiales"
                   />
+                  {query ? (
+                    <button
+                      onClick={() => setQuery('')}
+                      class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-gray-100 rounded text-sm"
+                      aria-label="Limpiar búsqueda"
+                    >
+                      Limpiar
+                    </button>
+                  ) : null}
                 </div>
-              )}
-              <div class="p-6">
-                <div class="inline-block px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full mb-3">
-                  {material.materia}
+
+                
+              </div>
+
+              <div class="overflow-x-auto no-scrollbar py-1">
+                <div class="flex gap-2 items-center w-max">
+                  {materias.map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setSelectedMateria(m)}
+                      class={`whitespace-nowrap px-3 py-1.5 rounded-full border ${selectedMateria === m ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-800'}`}
+                      aria-pressed={selectedMateria === m}
+                    >
+                      {m}
+                    </button>
+                  ))}
                 </div>
-                <h3 class="text-xl font-bold text-gray-800 mb-2">{material.titulo}</h3>
-                <p class="text-gray-600 text-sm mb-4 line-clamp-3">{material.descripcion}</p>
-                <div class="flex gap-2">
-                  <a
-                    href={material.url_recurso}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                    </svg>
-                    <span>Ver</span>
-                  </a>
-                  <a
-                    href={material.url_recurso}
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-                    title="Descargar material"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                    </svg>
-                  </a>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                <select value={selectedNivel} onChange={(e) => setSelectedNivel(e.target.value)} class="w-full px-3 py-2 border rounded-lg">
+                  {niveles.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+
+                <select value={selectedGrado} onChange={(e) => setSelectedGrado(e.target.value)} class="w-full px-3 py-2 border rounded-lg">
+                  {grados.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+
+                <div class="hidden md:flex items-center">
+                  <span class="text-sm text-gray-600">Resultados: <strong class="text-gray-800">{filtered.length}</strong></span>
                 </div>
               </div>
             </div>
-          ))}
+          </div>
         </div>
-      )}
-    </div>
+
+        {filtered.length === 0 ? (
+          <div class="text-center py-12">
+            <p class="text-gray-600">No se encontraron materiales que coincidan con los filtros.</p>
+            <button onClick={loadMateriales} class="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Recargar</button>
+          </div>
+        ) : (
+          <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filtered.map(m => (
+              <li key={m.id} class="bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden touch-manipulation">
+                <div class="h-36 sm:h-44 bg-gray-100 relative">
+                  {m.imagen_url ? (
+                    <img src={m.imagen_url} alt={m.titulo} class="w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    <div class="w-full h-full flex items-center justify-center text-gray-400">Sin imagen</div>
+                  )}
+                  <div class="absolute top-3 left-3 bg-blue-600 text-white px-2 py-1 rounded text-xs">{m.materia}</div>
+                  <div class="absolute top-3 right-3 flex flex-col items-end gap-1">
+                    {m.nivel ? (
+                      <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-200">{m.nivel}</span>
+                    ) : null}
+                    {m.grado ? (
+                      <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-200">Grado {m.grado}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <div class="p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-semibold text-base sm:text-lg line-clamp-2">{m.titulo}</h3>
+                    <div class="hidden text-right text-sm md:block">
+                      {/* Badges are shown on the image; keep small labels for accessibility on larger screens */}
+                      {m.nivel ? <div class="text-xs text-gray-500">{m.nivel}</div> : null}
+                      {m.grado ? <div class="text-xs text-gray-500">Grado {m.grado}</div> : null}
+                    </div>
+                  </div>
+                  {m.descripcion ? <p class="text-sm text-gray-600 mb-3 line-clamp-3">{m.descripcion}</p> : null}
+                  <div class="flex items-center justify-between">
+                    <a href={m.url_recurso} target="_blank" rel="noreferrer" class="text-blue-600 font-medium">Ver recurso →</a>
+                    
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }

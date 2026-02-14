@@ -8,10 +8,12 @@ async function resolveRepo() {
 
 export async function GET({ url }) {
   console.log('📡 GET /api/materiales - Request recibido');
+  const useSheets = process.env.USE_GOOGLE_SHEETS === 'true';
   console.log('🌍 Entorno:', {
     USE_GOOGLE_SHEETS: process.env.USE_GOOGLE_SHEETS,
     hasGoogleSheetId: !!process.env.GOOGLE_SHEET_ID,
-    hasCredentials: !!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH)
+    hasCredentials: !!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH),
+    resolvedSource: useSheets ? 'sheets' : 'mock'
   });
   
   try {
@@ -31,7 +33,8 @@ export async function GET({ url }) {
       headers: { 
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'X-Data-Source': useSheets ? 'sheets' : 'mock'
       }
     });
   } catch (error) {

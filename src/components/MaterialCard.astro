@@ -1,17 +1,23 @@
 ---
 const { material } = Astro.props;
 ---
-
-<article class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
-  <div class="relative h-48 bg-gray-200">
-    <img
-      src={material.imagen_url}
-      alt={material.titulo}
-      class="w-full h-full object-cover"
-      loading="lazy"
-    />
-    <div class="absolute top-3 right-3">
-      <span class="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+---
+// Props: material
+const { material } = Astro.props;
+---
+<article class="material-card">
+  <header class="card-header">
+    <h3>
+      {material.materia}
+      <span class="badges" style="margin-left:8px;">
+        {material.nivel ? <small class="badge nivel">{material.nivel}</small> : null}
+        {material.grado ? <small class="badge grado">{material.grado}</small> : null}
+      </span>
+    </h3>
+  </header>
+  {material.descripcion ? <p>{material.descripcion}</p> : null}
+  {material.url_recurso ? <a class="btn" href={material.url_recurso} target="_blank" rel="noreferrer">Ver recurso</a> : null}
+</article>
         {material.materia}
       </span>
     </div>

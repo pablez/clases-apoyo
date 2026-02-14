@@ -147,7 +147,7 @@ export async function createMaterial(payload) {
   const mock = await readMock();
   const list = mock.materiales || [];
   const newId = Math.max(0, ...list.map(m => parseInt(m.id || 0))) + 1;
-  const newMat = { id: String(newId), ...payload };
+    const newMat = { id: String(newId), ...payload, nivel: payload.nivel || '', grado: payload.grado || '' };
   list.push(newMat);
   mock.materiales = list;
   await writeMock(mock);

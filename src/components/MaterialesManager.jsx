@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'preact/hooks';
 
-export default function MaterialesManager({ apiBaseUrl = '/api' }) {
+export default function MaterialesManager({ apiBaseUrl = '/api', initialMaterials = [], onSave }) {
   const [materiales, setMateriales] = useState([]);
+  const [dataSource, setDataSource] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -10,14 +11,17 @@ export default function MaterialesManager({ apiBaseUrl = '/api' }) {
   const [editingId, setEditingId] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
+    id: '',
     materia: 'Matemáticas',
+    nivel: '',
+    grado: '',
     titulo: '',
     descripcion: '',
     url_recurso: '',
     imagen_url: ''
   });
 
-  const materias = ['Todas', 'Matemáticas', 'Física', 'Química', 'Programación'];
+  const materias = ['Todas', 'Matemáticas', 'Física', 'Química', 'Programación','Robotica','Mixto','Computacion e Informatica'];
 
   useEffect(() => {
     loadMateriales();
@@ -32,6 +36,8 @@ export default function MaterialesManager({ apiBaseUrl = '/api' }) {
       console.log('📡 Respuesta del servidor:', res.status, res.ok);
       if (!res.ok) throw new Error('Error al cargar materiales');
       const data = await res.json();
+      const src = res.headers.get('x-data-source') || '';
+      setDataSource(src);
       console.log('📦 Materiales recibidos:', data);
       setMateriales(data);
     } catch (err) {
@@ -41,6 +47,12 @@ export default function MaterialesManager({ apiBaseUrl = '/api' }) {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (initialMaterials && Array.isArray(initialMaterials) && initialMaterials.length > 0) {
+      setMateriales(initialMaterials);
+    }
+  }, [initialMaterials]);
 
   function resetForm() {
     setFormData({
@@ -63,7 +75,10 @@ export default function MaterialesManager({ apiBaseUrl = '/api' }) {
     setEditingId(material.id);
     setIsCreating(false);
     setFormData({
+      id: material.id || '',
       materia: material.materia || 'Matemáticas',
+      nivel: material.nivel || '',
+      grado: material.grado || '',
       titulo: material.titulo || '',
       descripcion: material.descripcion || '',
       url_recurso: material.url_recurso || '',
@@ -128,6 +143,7 @@ export default function MaterialesManager({ apiBaseUrl = '/api' }) {
       setSuccessMessage('✅ Material eliminado de Google Sheets correctamente');
       await loadMateriales();
       if (editingId === id) resetForm();
+      
       setTimeout(() => setSuccessMessage(''), 2000);
     } catch (err) {
       setError(err.message);
@@ -178,7 +194,14 @@ export default function MaterialesManager({ apiBaseUrl = '/api' }) {
       {/* Filtros */}
       <div class="bg-white rounded-lg shadow p-6">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold">Filtrar por Materia</h2>
+          <div class="flex items-baseline gap-4">
+            <h2 class="text-xl font-bold">Filtrar por Materia</h2>
+            <div class="text-sm text-gray-600">Total: <strong class="ml-1">{materiales.length}</strong></div>
+            <div class="text-sm text-gray-600">Filtrados: <strong class="ml-1">{filteredMateriales.length}</strong></div>
+          </div>
+          {dataSource && (
+            <div class="text-sm text-gray-500">Fuente: <strong class="ml-1">{dataSource}</strong></div>
+          )}
           <div class="flex gap-2">
             <button
               onClick={startCreating}
@@ -229,6 +252,9 @@ export default function MaterialesManager({ apiBaseUrl = '/api' }) {
                 <option value="Física">Física</option>
                 <option value="Química">Química</option>
                 <option value="Programación">Programación</option>
+                <option value="Robotica">Robotica</option>
+                <option value="Mixto">Mixto</option>
+                <option value="Computacion e Informatica">Computación e Informática</option>
               </select>
             </div>
             <div>
@@ -240,6 +266,38 @@ export default function MaterialesManager({ apiBaseUrl = '/api' }) {
                 class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
                 placeholder="Título del material"
               />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Nivel</label>
+              <select
+                value={formData.nivel}
+                name="nivel"
+                onChange={(e) => setFormData({ ...formData, nivel: e.target.value })}
+                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seleccione nivel</option>
+                <option value="Inicial">Inicial</option>
+                <option value="Primaria">Primaria</option>
+                <option value="Secundaria">Secundaria</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Grado</label>
+              <select
+                value={formData.grado}
+                name="grado"
+                onChange={(e) => setFormData({ ...formData, grado: e.target.value })}
+                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seleccione grado</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
             </div>
             <div class="md:col-span-2">
               <label class="block text-sm font-medium mb-1">Descripción</label>

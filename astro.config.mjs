@@ -16,6 +16,14 @@ export default defineConfig({
   },
   vite: {
     plugins: [tailwindcss()],
+    resolve: {
+      alias: {
+        react: 'preact/compat',
+        'react-dom': 'preact/compat',
+        'react-dom/test-utils': 'preact/test-utils',
+        'react/jsx-runtime': 'preact/jsx-runtime'
+      }
+    },
     define: {
       'process.env.USE_GOOGLE_SHEETS': JSON.stringify(process.env.USE_GOOGLE_SHEETS),
       'process.env.GOOGLE_SHEET_ID': JSON.stringify(process.env.GOOGLE_SHEET_ID),
