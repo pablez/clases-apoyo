@@ -89,6 +89,19 @@ export async function deleteAlumno(id) {
   return { success: true };
 }
 
+export async function cascadeDelete(id) {
+  const mock = await readMock();
+  // keep alumno but remove asistencias and usuario entries
+  if (mock.asistencias && Array.isArray(mock.asistencias)) {
+    mock.asistencias = mock.asistencias.filter(a => String(a.alumnoId || a.id_alumno || a.alumno) !== String(id));
+  }
+  if (mock.usuarios && Array.isArray(mock.usuarios)) {
+    mock.usuarios = mock.usuarios.filter(u => String(u.id_alumno || u.alumnoId || u.alumno) !== String(id));
+  }
+  await writeMock(mock);
+  return { success: true };
+}
+
 export async function getAsistencias(alumnoId) {
   const mock = await readMock();
   const list = mock.asistencias || [];
@@ -194,6 +207,7 @@ export default {
   createAlumno,
   updateAlumno,
   deleteAlumno,
+  cascadeDelete,
   getAsistencias,
   createAsistencia,
   updateAsistencia,

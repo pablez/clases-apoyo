@@ -4,16 +4,44 @@ import { readSheetRange, appendSheetRange, updateSheetRange, rowsToObjects } fro
 export async function getAlumnos() {
   const rows = await readSheetRange('Alumnos!A1:H100');
   const objs = rowsToObjects(rows);
-  return objs.map(o => ({
-    id: o.id_alumno || o.id || o.idAlumno || '',
-    nombre: o.nombre || '',
-    edad: o.edad || '',
-    curso: o.curso || '',
-    telefono_padre: o.telefono_padre || o.telefono || '',
-    materias: o.materias || '',
-    clases_compradas: o.clases_compradas || '',
-    horas: o.horas || ''
-  }));
+  // Also read Usuarios sheet to attach user info (email/rol/password) when available
+  let usuariosMap = {};
+  try {
+    const urows = await readSheetRange('Usuarios!A1:E100');
+    const uobjs = rowsToObjects(urows);
+    uobjs.forEach(u => {
+      const alumnoId = u.id_alumno || u.id || u.idAlumno || '';
+      if (alumnoId) {
+        // Sanitize usuario object: do not expose internal id_usuario or password to client
+        usuariosMap[String(alumnoId)] = {
+          email: u.email || u.correo || '',
+          rol: u.rol || 'padre'
+        };
+      }
+    });
+  } catch (e) {
+    // ignore if Usuarios sheet not present
+  }
+
+  return objs.map(o => {
+    const alumnoId = o.id_alumno || o.id || o.idAlumno || '';
+    const usuario = usuariosMap[String(alumnoId)];
+    const materiasVal = Array.isArray(o.materias) ? o.materias.join(', ') : (o.materias || '');
+      return {
+      id: alumnoId,
+      nombre: o.nombre || '',
+      edad: o.edad || '',
+      curso: o.curso || '',
+      telefono_padre: o.telefono_padre || o.telefono || '',
+      materias: materiasVal,
+      clases_compradas: o.clases_compradas || '',
+      horas: o.horas || '',
+      email: usuario ? (usuario.email || '') : (o.email || ''),
+      rol: usuario ? (usuario.rol || 'padre') : (o.rol || undefined),
+      // attach sanitized usuario (no id_usuario or password)
+      _usuario: usuario || null
+    };
+  });
 }
 
 export async function createAlumno(payload) {
@@ -22,7 +50,8 @@ export async function createAlumno(payload) {
   const objs = rowsToObjects(rows);
   const ids = objs.map(o => parseInt(o.id_alumno || o.id || 0) || 0);
   const newId = String(Math.max(0, ...ids) + 1);
-  const row = [newId, payload.nombre || '', payload.edad || '', payload.curso || '', payload.telefono_padre || '', payload.materias || '', payload.clases_compradas || '', payload.horas || ''];
+  const materiasVal = Array.isArray(payload.materias) ? payload.materias.join(', ') : (payload.materias || '');
+  const row = [newId, payload.nombre || '', payload.edad || '', payload.curso || '', payload.telefono_padre || '', materiasVal, payload.clases_compradas || '', payload.horas || ''];
   const result = await appendSheetRange('Alumnos!A:H', [row]);
   // Si el payload trae credenciales para usuario, agregar fila en hoja "Usuarios"
   let usuarioResult = null;
@@ -156,4 +185,45 @@ export async function deleteAlumno(id) {
   return { success: true };
 }
 
-export default { getAlumnos, createAlumno, updateAlumno };
+export async function cascadeDelete(id) {
+  // Only remove asistencias and usuario rows, keep the alumno row intact
+  // Eliminar asistencias asociadas (Asistencias!A1:F100)
+  try {
+    const asisRange = 'Asistencias!A1:F100';
+    const asisRows = await readSheetRange(asisRange);
+    if (asisRows && asisRows.length > 0) {
+      const asisHeaders = asisRows[0];
+      const asisBody = asisRows.slice(1).filter(r => String(r[1]) !== String(id));
+      const newAsisRows = [asisHeaders, ...asisBody];
+      const originalAsisLen = asisRows.length;
+      while (newAsisRows.length < originalAsisLen) {
+        newAsisRows.push(new Array(asisHeaders.length).fill(''));
+      }
+      await updateSheetRange(`Asistencias!A1:F${originalAsisLen}`, newAsisRows);
+    }
+  } catch (e) {
+    console.warn('No se pudo eliminar asistencias del alumno (cascade):', e.message);
+  }
+
+  // Eliminar usuario asociado en hoja Usuarios (Usuarios!A1:E100)
+  try {
+    const usuariosRange = 'Usuarios!A1:E100';
+    const usuariosRows = await readSheetRange(usuariosRange);
+    if (usuariosRows && usuariosRows.length > 0) {
+      const usuariosHeaders = usuariosRows[0];
+      const usuariosBody = usuariosRows.slice(1).filter(r => String(r[1]) !== String(id));
+      const newUsuariosRows = [usuariosHeaders, ...usuariosBody];
+      const originalUsuariosLen = usuariosRows.length;
+      while (newUsuariosRows.length < originalUsuariosLen) {
+        newUsuariosRows.push(new Array(usuariosHeaders.length).fill(''));
+      }
+      await updateSheetRange(`Usuarios!A1:E${originalUsuariosLen}`, newUsuariosRows);
+    }
+  } catch (e) {
+    console.warn('No se pudo eliminar usuario asociado al alumno (cascade):', e.message);
+  }
+
+  return { success: true };
+}
+
+export default { getAlumnos, createAlumno, updateAlumno, deleteAlumno, cascadeDelete };

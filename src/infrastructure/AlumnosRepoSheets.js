@@ -28,7 +28,25 @@ export default class AlumnosRepoSheets {
     const rows = await readSheetRange('Alumnos!A1:H100');
     const objs = rowsToObjects(rows);
     const found = objs.find(a => String(a.id_alumno || a.id || '') === String(id));
-    return normalizeAlumno(found || null);
+    const alumno = normalizeAlumno(found || null);
+    if (!alumno) return null;
+    // Try to attach usuario info from Usuarios sheet when available
+    try {
+      const usuarios = await readUsuarios();
+      const match = (usuarios || []).find(u => String(u.id_alumno || u.id || '').toLowerCase() === String(alumno.id).toLowerCase() || String(u.id_usuario || u.id || '').toLowerCase() === String(alumno.id).toLowerCase());
+      if (match) {
+        // Sanitize usuario before attaching: do not expose id_usuario or password
+        alumno._usuario = {
+          email: match.email || match.correo || '',
+          rol: match.rol || 'padre'
+        };
+        alumno.email = alumno._usuario.email || alumno.email || '';
+        alumno.rol = alumno._usuario.rol || alumno.rol || 'padre';
+      }
+    } catch (e) {
+      // ignore
+    }
+    return alumno;
   }
 
   // Busca por email (o id/nombre). Si existe una hoja Usuarios, primero la consulta

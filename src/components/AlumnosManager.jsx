@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import AlumnosForm from './AlumnosForm.jsx';
+import useAlumnos from '../hooks/useAlumnos.js';
+import AlumnosTable from './AlumnosTable.jsx';
+import AlumnosCardList from './AlumnosCardList.jsx';
+import AlumnoModal from './AlumnosModals/AlumnoModal.jsx';
+import UsuarioModal from './AlumnosModals/UsuarioModal.jsx';
+import EditAlumnoModal from './AlumnosModals/EditAlumnoModal.jsx';
 
 export default function AlumnosManager({ apiBaseUrl = '/api' }) {
-  const [alumnos, setAlumnos] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  // alumnos state and CRUD are handled by `useAlumnos` below
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
@@ -27,48 +30,132 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deletingId, setDeletingId] = useState(null);
+  const [cascadeDeletingId, setCascadeDeletingId] = useState(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [pendingCascadeId, setPendingCascadeId] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const [showAlumnoModal, setShowAlumnoModal] = useState(false);
+  const [showUsuarioModal, setShowUsuarioModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editActiveTab, setEditActiveTab] = useState('alumno');
 
-  async function loadAlumnos() {
-    setLoading(true);
-    setError(null);
-    try {
-      // cache-bust to avoid stale Google Sheets eventual consistency
-      const res = await fetch(`${apiBaseUrl}/alumnos?t=${Date.now()}`);
-      if (!res.ok) throw new Error('Error al cargar alumnos');
-      const data = await res.json();
-      setAlumnos(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  // use custom hook for alumnos CRUD (provides alumnos, loading, saving, error, and actions)
+  const {
+    alumnos,
+    loading,
+    saving: hookSaving,
+    error: hookError,
+    loadAlumnos,
+    createAlumno,
+    updateAlumno,
+    deleteAlumno,
+    cascadeDeleteAlumno,
+    setError: setHookError
+  } = useAlumnos(apiBaseUrl, { onToast: addToast });
+
+  // keep `saving` reference compatible with existing code
+  const saving = hookSaving;
+  const error = hookError;
+
+  function addToast(message, type = 'success', ttl = 4000) {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    setToasts(t => [{ id, message, type }, ...t]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), ttl);
   }
 
-  useEffect(() => {
-    loadAlumnos();
-  }, []);
 
   function startCreating() {
     resetForm();
+    // legacy start; keep for compatibility but prefer modal flow
     setIsCreating(true);
     setEditingId(null);
   }
 
+  function startCreatingModal() {
+    resetForm();
+    setIsCreating(false);
+    setEditingId(null);
+    setShowAlumnoModal(true);
+  }
+
+  function submitAlumnoModal() {
+    // basic validation
+    const errors = {};
+    if (!formData.nombre || !formData.nombre.trim()) errors.nombre = 'El nombre es obligatorio';
+    if (Object.keys(errors).length) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
+    // close alumno modal and open usuario modal
+    setShowAlumnoModal(false);
+    setShowUsuarioModal(true);
+  }
+
+  function cancelCreateFlow() {
+    setShowAlumnoModal(false);
+    setShowUsuarioModal(false);
+    resetForm();
+  }
+
+  async function submitUsuarioModal() {
+    // minimal validation
+    const errors = {};
+    if (!formData.email || !formData.email.trim()) errors.email = 'El email es obligatorio';
+    if (!formData.password || !String(formData.password).trim()) errors.password = 'La contraseña es obligatoria';
+    if (Object.keys(errors).length) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
+    // delegate creation to hook (handles saving state and toasts)
+    setShowUsuarioModal(false);
+    try {
+      const payload = {
+        nombre: formData.nombre,
+        edad: formData.edad,
+        curso: formData.curso,
+        telefono_padre: formData.telefono_padre,
+        materias: Array.isArray(formData.materias) ? formData.materias : (typeof formData.materias === 'string' ? formData.materias.split(',').map(s=>s.trim()).filter(Boolean) : formData.materias),
+        clases_compradas: formData.clases_compradas,
+        horas: formData.horas,
+        email: formData.email,
+        password: formData.password,
+        rol: formData.rol || 'padre'
+      };
+      await createAlumno(payload);
+      resetForm();
+    } catch (err) {
+      addToast(String(err.message || err), 'error');
+      setHookError(err.message || String(err));
+    }
+  }
+
   function editAlumno(alumno) {
+    // Log for debugging: inspect alumno and linked usuario when opening edit modal
+    try {
+      console.log('Opening edit modal for alumno:', alumno);
+      if (alumno && alumno._usuario) console.log('Attached _usuario:', alumno._usuario);
+    } catch (e) {
+      // ignore logging errors
+    }
     setFormData({
       nombre: alumno.nombre || '',
       edad: alumno.edad || '',
       curso: alumno.curso || '',
       telefono_padre: alumno.telefono_padre || '',
-      materias: Array.isArray(alumno.materias) ? alumno.materias.join(', ') : '',
+      materias: Array.isArray(alumno.materias) ? alumno.materias.join(', ') : (typeof alumno.materias === 'string' ? alumno.materias : (alumno.materias ?? '')),
       clases_compradas: alumno.clases_compradas || '',
       horas: alumno.horas || '',
-      email: alumno.email || '',
+      email: (alumno._usuario && (alumno._usuario.email || alumno._usuario.correo)) || alumno.email || '',
+      // Do NOT prefill password for security — require explicit change
       password: '',
-      rol: alumno.rol || 'padre'
+      rol: (alumno._usuario && (alumno._usuario.rol)) || alumno.rol || 'padre'
     });
     setEditingId(alumno.id);
     setIsCreating(false);
+    setEditActiveTab('alumno');
+    setShowEditModal(true);
   }
 
   function resetForm() {
@@ -90,13 +177,12 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
   }
 
   async function handleSave() {
-    setSaving(true);
+    // saving handled by hook methods
     const errors = {};
     if (!formData.nombre.trim()) errors.nombre = 'El nombre es obligatorio';
     if (formData.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(formData.email)) errors.email = 'Email inválido';
     if (Object.keys(errors).length) {
       setFormErrors(errors);
-      setSaving(false);
       return;
     }
     setFormErrors({});
@@ -107,98 +193,154 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
       };
 
       if (isCreating) {
-        const res = await fetch(`${apiBaseUrl}/alumnos`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || 'Error al crear alumno');
-        }
+        await createAlumno(payload);
         setSuccessMessage('✅ Alumno creado y guardado en Google Sheets correctamente');
       } else {
         console.log('🔁 Enviando PUT para id:', editingId, 'payload:', payload);
-        const res = await fetch(`${apiBaseUrl}/alumnos/${editingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) {
-          let errorText = '';
-          try { errorText = await res.text(); } catch (e) { errorText = String(e); }
-          console.error('PUT /api/alumnos error response:', res.status, errorText);
-          const errorData = (() => { try { return JSON.parse(errorText); } catch { return null } })();
-          throw new Error((errorData && errorData.error) || `Error al actualizar alumno (${res.status})`);
-        }
+        await updateAlumno(editingId, payload);
         setSuccessMessage('✅ Alumno actualizado en Google Sheets correctamente');
       }
 
-      await loadAlumnos();
+      // close edit modal if open
+      if (showEditModal) setShowEditModal(false);
       setTimeout(() => {
         resetForm();
         setSuccessMessage('');
       }, 2000);
     } catch (err) {
-      setError(err.message);
+      setHookError(err.message || String(err));
     } finally {
-      setSaving(false);
+      // hook manages saving
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm('¿Estás seguro de eliminar este alumno?')) return;
-    
-    setError(null);
-    setSaving(true);
+  // request flow: open confirmation modal
+  function requestDelete(id) {
+    setPendingDeleteId(id);
+  }
+
+  function requestCascadeDelete(id) {
+    setPendingCascadeId(id);
+  }
+
+  async function confirmDelete() {
+    const id = pendingDeleteId;
+    if (!id) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`${apiBaseUrl}/alumnos/${id}`, {
-        method: 'DELETE'
-      });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Error al eliminar alumno');
-      }
-      // optimistically remove from UI immediately
-      setAlumnos(prev => prev.filter(a => String(a.id) !== String(id)));
-      setSuccessMessage('✅ Alumno eliminado de Google Sheets correctamente');
-      try { await loadAlumnos(); } catch (e) { console.warn('Warning: loadAlumnos after delete failed', e); }
-      if (editingId === id) resetForm();
-      setTimeout(() => setSuccessMessage(''), 2000);
+      await deleteAlumno(id);
+      addToast('Alumno eliminado correctamente', 'success');
+      setPendingDeleteId(null);
     } catch (err) {
-      setError(err.message);
+      addToast(String(err.message || err), 'error');
+      setHookError(err.message || String(err));
     } finally {
-      setSaving(false);
       setDeletingId(null);
     }
   }
 
+  async function confirmCascadeDelete() {
+    const id = pendingCascadeId;
+    if (!id) return;
+    setCascadeDeletingId(id);
+    try {
+      await cascadeDeleteAlumno(id);
+      addToast('Alumno y datos relacionados eliminados correctamente', 'success');
+      setPendingCascadeId(null);
+    } catch (err) {
+      addToast(String(err.message || err), 'error');
+      setHookError(err.message || String(err));
+    } finally {
+      setCascadeDeletingId(null);
+    }
+  }
+
+  function cancelPendingDelete() {
+    setPendingDeleteId(null);
+  }
+
+  function cancelPendingCascade() {
+    setPendingCascadeId(null);
+  }
+
   return (
-    <div class="space-y-6">
-      {error && (
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-          <strong class="font-bold">Error: </strong>
-          <span class="block sm:inline">{error}</span>
-          <button onClick={() => setError(null)} class="absolute top-0 right-0 px-4 py-3">
-            <span class="text-2xl">&times;</span>
-          </button>
-        </div>
-      )}
-
+    <div class="space-y-4">
       {successMessage && (
-        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-          {successMessage}
+        <div class="bg-green-100 text-green-700 p-4 rounded mb-4">{successMessage}</div>
+      )}
+      {error && (
+        <div class="bg-red-100 text-red-700 p-4 rounded mb-4">{error}</div>
+      )}
+
+      {/* Toast notifications */}
+      <div class="fixed top-4 right-4 space-y-2 z-40">
+        {toasts.map(t => (
+          <div key={t.id} class={`p-3 rounded text-white ${t.type === 'error' ? 'bg-red-500' : t.type === 'info' ? 'bg-blue-500' : 'bg-green-500'}`}>
+            {t.message}
+          </div>
+        ))}
+      </div>
+
+      <AlumnoModal
+        visible={showAlumnoModal}
+        formData={formData}
+        setFormData={setFormData}
+        formErrors={formErrors}
+        onSubmit={submitAlumnoModal}
+        onCancel={cancelCreateFlow}
+      />
+
+      <EditAlumnoModal
+        visible={showEditModal}
+        formData={formData}
+        setFormData={setFormData}
+        formErrors={formErrors}
+        onClose={() => { setShowEditModal(false); resetForm(); }}
+        editActiveTab={editActiveTab}
+        setEditActiveTab={setEditActiveTab}
+        handleSave={handleSave}
+        saving={saving}
+        resetForm={resetForm}
+      />
+
+      <UsuarioModal
+        visible={showUsuarioModal}
+        formData={formData}
+        setFormData={setFormData}
+        formErrors={formErrors}
+        onSubmit={submitUsuarioModal}
+        onBack={() => { setShowUsuarioModal(false); setShowAlumnoModal(true); }}
+      />
+
+      {/* Confirmación: eliminar alumno (simple) */}
+      {pendingDeleteId && (
+        <div class="fixed inset-0 bg-black bg-opacity-40 flex items-end sm:items-center justify-center z-50">
+          <div class="bg-white rounded-t-lg sm:rounded p-4 sm:p-6 w-full sm:max-w-md">
+            <h3 class="text-lg font-bold mb-2">Confirmar eliminación</h3>
+            <p class="text-sm text-gray-700 mb-4">¿Estás seguro? Esta acción eliminará el alumno seleccionado.</p>
+            <div class="flex flex-col sm:flex-row sm:justify-end gap-2">
+              <button onClick={cancelPendingDelete} class="w-full sm:w-auto px-4 py-2 bg-gray-200 rounded">Cancelar</button>
+              <button onClick={confirmDelete} disabled={deletingId === pendingDeleteId} class="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50">
+                {deletingId === pendingDeleteId ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {saving && (
-        <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded flex items-center gap-3">
-          <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span class="font-medium">Guardando en Google Sheets...</span>
+      {/* Confirmación: eliminar alumno y cascada (todo) */}
+      {pendingCascadeId && (
+        <div class="fixed inset-0 bg-black bg-opacity-40 flex items-end sm:items-center justify-center z-50">
+          <div class="bg-white rounded-t-lg sm:rounded p-4 sm:p-6 w-full sm:max-w-md">
+            <h3 class="text-lg font-bold mb-2">Eliminar con datos relacionados</h3>
+            <p class="text-sm text-gray-700 mb-4">Esta acción eliminará el alumno y todo su historial (asistencias, registros). Esta operación no se puede deshacer.</p>
+            <div class="flex flex-col sm:flex-row sm:justify-end gap-2">
+              <button onClick={cancelPendingCascade} class="w-full sm:w-auto px-4 py-2 bg-gray-200 rounded">Cancelar</button>
+              <button onClick={confirmCascadeDelete} disabled={cascadeDeletingId === pendingCascadeId} class="w-full sm:w-auto px-4 py-2 bg-red-700 text-white rounded disabled:opacity-50">
+                {cascadeDeletingId === pendingCascadeId ? 'Eliminando...' : 'Borrar todo'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -219,7 +361,7 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
           </div>
           <div class="flex gap-2 ml-4">
             <button
-              onClick={startCreating}
+              onClick={startCreatingModal}
               class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -254,87 +396,28 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
         {!loading && alumnos.length > 0 && (
           <>
             {/* Desktop / tablet: tabla clásica */}
-            <div class="hidden sm:block overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left">Nombre</th>
-                    <th class="px-4 py-2 text-left">Edad</th>
-                    <th class="px-4 py-2 text-left">Curso</th>
-                    <th class="px-4 py-2 text-left">Teléfono</th>
-                    <th class="px-4 py-2 text-left">Materias</th>
-                    <th class="px-4 py-2 text-left">Clases</th>
-                    <th class="px-4 py-2 text-left">Horas</th>
-                    <th class="px-4 py-2 text-left">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const q = searchTerm.trim().toLowerCase();
-                    const filtered = alumnos.filter(a => {
-                      if (!q) return true;
-                      return [a.nombre, a.curso, a.telefono_padre, (a.email||'')].some(v => String(v||'').toLowerCase().includes(q));
-                    });
-                    const total = filtered.length;
-                    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-                    if (page > totalPages) setPage(totalPages);
-                    const start = (page - 1) * pageSize;
-                    const visible = filtered.slice(start, start + pageSize);
-                    return visible.map(alumno => (
-                    <tr key={alumno.id} class="border-t hover:bg-gray-50">
-                      <td class="px-4 py-2 font-medium">{alumno.nombre}</td>
-                      <td class="px-4 py-2">{alumno.edad || 'N/A'}</td>
-                      <td class="px-4 py-2">{alumno.curso || 'N/A'}</td>
-                      <td class="px-4 py-2">{alumno.telefono_padre || 'N/A'}</td>
-                      <td class="px-4 py-2">
-                        <span class="text-xs">
-                          {Array.isArray(alumno.materias) ? alumno.materias.join(', ') : 'N/A'}
-                        </span>
-                      </td>
-                      <td class="px-4 py-2">{alumno.clases_compradas || 0}</td>
-                      <td class="px-4 py-2">{alumno.horas || 'N/A'}</td>
-                      <td class="px-4 py-2 flex gap-2">
-                        <button
-                          onClick={() => editAlumno(alumno)}
-                          class="text-blue-600 hover:underline text-sm flex items-center gap-2"
-                          aria-label={`Editar ${alumno.nombre}`}
-                          disabled={deletingId === alumno.id}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5h6M5 7v12a2 2 0 002 2h10a2 2 0 002-2V7" />
-                          </svg>
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleDelete(alumno.id)}
-                          class="text-red-600 hover:underline text-sm flex items-center gap-2"
-                          aria-label={`Eliminar ${alumno.nombre}`}
-                          disabled={deletingId === alumno.id}
-                        >
-                          {deletingId === alumno.id ? (
-                            <>
-                              <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              Eliminando...
-                            </>
-                          ) : (
-                            <>
-                              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                              Eliminar
-                            </>
-                          )}
-                        </button>
-                      </td>
-                    </tr>
-                    ));
-                  })()}
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              const q = searchTerm.trim().toLowerCase();
+              const filtered = alumnos.filter(a => {
+                if (!q) return true;
+                return [a.nombre, a.curso, a.telefono_padre, (a.email||'')].some(v => String(v||'').toLowerCase().includes(q));
+              });
+              const total = filtered.length;
+              const totalPages = Math.max(1, Math.ceil(total / pageSize));
+              if (page > totalPages) setPage(totalPages);
+              const start = (page - 1) * pageSize;
+              const visible = filtered.slice(start, start + pageSize);
+              return (
+                <AlumnosTable
+                  rows={visible}
+                  onEdit={editAlumno}
+                  onRequestDelete={requestDelete}
+                  onRequestCascade={requestCascadeDelete}
+                  deletingId={deletingId}
+                  cascadeDeletingId={cascadeDeletingId}
+                />
+              );
+            })()}
 
             {/* Pagination controls */}
             <div class="mt-4 flex items-center justify-between">
@@ -362,198 +445,24 @@ export default function AlumnosManager({ apiBaseUrl = '/api' }) {
             </div>
 
             {/* Mobile: tarjetas compactas */}
-            <div class="block sm:hidden space-y-3">
-              {alumnos
-                .filter(a => {
-                  const q = searchTerm.trim().toLowerCase();
-                  if (!q) return true;
-                  return [a.nombre, a.curso, a.telefono_padre, (a.email||'')].some(v => String(v||'').toLowerCase().includes(q));
-                })
-                .map(alumno => (
-                <div key={alumno.id} class="bg-white rounded-lg shadow p-3 border">
-                  <div class="flex justify-between items-start gap-3">
-                    <div class="flex-1 min-w-0">
-                      <div class="text-base font-semibold truncate">{alumno.nombre}</div>
-                      <div class="text-xs text-gray-500 truncate">{alumno.curso || 'N/A'} · {alumno.edad || 'N/A'} años</div>
-                      <div class="text-xs text-gray-500 mt-1 truncate">{alumno.telefono_padre || 'N/A'}</div>
-                      <div class="text-xs text-gray-500 mt-1 truncate">{alumno.email || '—'} · {alumno.rol || 'padre'}</div>
-                    </div>
-                    <div class="flex flex-col items-end gap-2">
-                      <div class="text-sm font-medium text-gray-700">{alumno.clases_compradas || 0} clases</div>
-                        <div class="flex gap-2">
-                        <button onClick={() => editAlumno(alumno)} class="px-3 py-1 bg-blue-600 text-white rounded text-xs" disabled={deletingId === alumno.id}>✏️</button>
-                        <button onClick={() => handleDelete(alumno.id)} class="px-3 py-1 bg-red-600 text-white rounded text-xs" disabled={deletingId === alumno.id}>
-                          {deletingId === alumno.id ? '...' : '🗑️'}
-                        </button>
-                      </div>
-                      <button onClick={() => setExpandedId(expandedId === alumno.id ? null : alumno.id)} class="text-xs text-gray-500 mt-1">
-                        {expandedId === alumno.id ? 'Ocultar' : 'Ver más'}
-                      </button>
-                    </div>
-                  </div>
-                  {expandedId === alumno.id && (
-                    <div class="mt-3 text-xs text-gray-600 space-y-1">
-                      <div><strong>Materias:</strong> {Array.isArray(alumno.materias) ? alumno.materias.join(', ') : 'N/A'}</div>
-                      <div><strong>Horas:</strong> {alumno.horas || 'N/A'}</div>
-                      <div><strong>Teléfono:</strong> {alumno.telefono_padre || 'N/A'}</div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <AlumnosCardList
+              rows={alumnos.filter(a => {
+                const q = searchTerm.trim().toLowerCase();
+                if (!q) return true;
+                return [a.nombre, a.curso, a.telefono_padre, (a.email||'')].some(v => String(v||'').toLowerCase().includes(q));
+              }).slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize)}
+              onEdit={editAlumno}
+              onRequestDelete={requestDelete}
+              onRequestCascade={requestCascadeDelete}
+              expandedId={expandedId}
+              setExpandedId={setExpandedId}
+              deletingId={deletingId}
+              cascadeDeletingId={cascadeDeletingId}
+            />
           </>
         )}
       </div>
-
-      {/* Formulario de Creación/Edición */}
-      {(isCreating || editingId) && (
-        <div class="bg-white rounded-lg shadow p-6">
-          <h3 class="text-lg font-bold mb-4">
-            {isCreating ? 'Crear Nuevo Alumno' : 'Editar Alumno'}
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(isCreating || editingId) && (
-              <>
-                <div>
-                  <label class="block text-sm font-medium mb-1">Email (usuario)</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onInput={(e) => setFormData({ ...formData, email: e.target.value })}
-                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                    placeholder="padre@example.com"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1">Password (usuario)</label>
-                  <input
-                    type="password"
-                    value={formData.password}
-                    onInput={(e) => setFormData({ ...formData, password: e.target.value })}
-                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                    placeholder="123456"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1">Rol</label>
-                  <select
-                    value={formData.rol}
-                    onInput={(e) => setFormData({ ...formData, rol: e.target.value })}
-                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="padre">padre</option>
-                    <option value="alumno">alumno</option>
-                  </select>
-                </div>
-              </>
-            )}
-            <div>
-              <label class="block text-sm font-medium mb-1">Nombre *</label>
-              <input
-                id="nombre-input"
-                type="text"
-                value={formData.nombre}
-                onInput={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                class={`w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 ${formErrors.nombre ? 'border-red-500' : ''}`}
-                placeholder="Nombre completo"
-                aria-invalid={formErrors.nombre ? 'true' : 'false'}
-                aria-describedby={formErrors.nombre ? 'error-nombre' : undefined}
-              />
-              {formErrors.nombre && <p id="error-nombre" class="text-sm text-red-600 mt-1">{formErrors.nombre}</p>}
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">Edad</label>
-              <input
-                type="number"
-                value={formData.edad}
-                onInput={(e) => setFormData({ ...formData, edad: e.target.value })}
-                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                placeholder="18"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">Curso</label>
-              <input
-                type="text"
-                value={formData.curso}
-                onInput={(e) => setFormData({ ...formData, curso: e.target.value })}
-                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                placeholder="4to Secundaria"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">Teléfono Padre</label>
-              <input
-                type="text"
-                value={formData.telefono_padre}
-                onInput={(e) => setFormData({ ...formData, telefono_padre: e.target.value })}
-                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                placeholder="+591 74325440"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">Materias (separadas por comas)</label>
-              <input
-                type="text"
-                value={formData.materias}
-                onInput={(e) => setFormData({ ...formData, materias: e.target.value })}
-                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                placeholder="Matemáticas, Física"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">Clases Compradas</label>
-              <input
-                type="number"
-                value={formData.clases_compradas}
-                onInput={(e) => setFormData({ ...formData, clases_compradas: e.target.value })}
-                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                placeholder="12"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">Horas por Clase</label>
-              <input
-                type="text"
-                value={formData.horas}
-                onInput={(e) => setFormData({ ...formData, horas: e.target.value })}
-                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                placeholder="2 horas"
-              />
-            </div>
-          </div>
-          <div class="mt-6 flex gap-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              class={`px-6 py-2 rounded font-medium ${
-                saving 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
-              } text-white flex items-center gap-2`}
-            >
-              {saving && (
-                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
-              {!saving && (
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-              {saving ? 'Guardando...' : (isCreating ? 'Crear' : 'Guardar Cambios')}
-            </button>
-            <button
-              onClick={resetForm}
-              class="px-6 py-2 rounded font-medium bg-gray-400 hover:bg-gray-500 text-white"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+  

@@ -11,17 +11,17 @@
       <span id="nav-auth-status" class="text-sm text-gray-500 ml-2"></span>
     </div>
     <div class="md:hidden flex items-center">
-      <button id="nav-toggle" aria-label="Abrir menú" class="p-2 rounded-md focus:outline-none focus:ring">
+      <button id="nav-toggle" aria-label="Abrir menú" aria-controls="nav-mobile" aria-expanded="false" class="p-3 rounded-md focus:outline-none focus:ring focus:ring-blue-300">
         <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
       </button>
     </div>
   </div>
-  <div id="nav-mobile" class="md:hidden hidden px-4 pb-4">
-    <a href="/" class="block text-sm text-gray-700 py-2">Inicio</a>
-    <a href="/materiales" class="block text-sm text-gray-700 py-2">Materiales</a>
+  <div id="nav-mobile" class="md:hidden hidden px-2 pb-4 bg-white border-t" role="menu" aria-hidden="true">
+    <a href="/" class="block text-base text-gray-700 py-3 px-2 rounded hover:bg-gray-50" role="menuitem">Inicio</a>
+    <a href="/materiales" class="block text-base text-gray-700 py-3 px-2 rounded hover:bg-gray-50" role="menuitem">Materiales</a>
     
-    <a id="nav-auth-link-mobile" href="/login" class="block text-sm text-gray-700 py-2">Iniciar sesión</a>
-    <div id="nav-auth-status-mobile" class="text-sm text-gray-500 py-2"></div>
+    <a id="nav-auth-link-mobile" href="/login" class="block text-base text-gray-700 py-3 px-2 rounded hover:bg-gray-50" role="menuitem">Iniciar sesión</a>
+    <div id="nav-auth-status-mobile" class="text-sm text-gray-500 py-2 px-2"></div>
   </div>
 </nav>
 <script>
