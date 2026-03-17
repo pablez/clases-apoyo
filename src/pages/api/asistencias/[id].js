@@ -1,30 +1,24 @@
 export const prerender = false;
 
-async function resolveRepo() {
-  const useSheets = process.env.USE_GOOGLE_SHEETS === 'true';
-  if (useSheets) return import('../../../infrastructure/sheets/asistencias.js');
-  return import('../../../infrastructure/mock/index.js');
-}
+import { getContainer } from '../../../infrastructure/container.js';
 
 export async function PUT({ params, request }) {
   try {
     const body = await request.json();
-    const repo = await resolveRepo();
-    const data = await repo.updateAsistencia(params.id, body);
+    const { repositories } = getContainer();
+    const data = await repositories.asistenciasRepository.update(params.id, body);
     return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
-    console.error('Error al actualizar asistencia:', error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }
 
 export async function DELETE({ params }) {
   try {
-    const repo = await resolveRepo();
-    const data = await repo.deleteAsistencia(params.id);
+    const { repositories } = getContainer();
+    const data = await repositories.asistenciasRepository.delete(params.id);
     return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
-    console.error('Error al eliminar asistencia:', error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

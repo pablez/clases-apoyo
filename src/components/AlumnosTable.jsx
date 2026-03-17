@@ -1,4 +1,30 @@
-export default function AlumnosTable({ rows = [], onEdit, onRequestDelete, onRequestCascade, deletingId, cascadeDeletingId }) {
+function ProgressCell({ alumno, asistenciasStats, loadingAsistenciasStats }) {
+  const total = Number(alumno.clases_compradas || 0) || 0;
+  const presentes = Number(asistenciasStats?.[String(alumno.id)]?.presentes || 0) || 0;
+  const consumidas = Math.min(total, presentes);
+  const restantes = Math.max(0, total - presentes);
+  const pct = total > 0 ? Math.round((consumidas / total) * 100) : 0;
+
+  if (loadingAsistenciasStats) {
+    return <div class="h-2 w-24 bg-gray-100 rounded animate-pulse" />;
+  }
+
+  if (!total) return <span class="text-xs text-gray-500">—</span>;
+
+  return (
+    <div class="min-w-[160px]">
+      <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
+        <span>{restantes} restantes</span>
+        <span>{pct}%</span>
+      </div>
+      <div class="h-2 w-full bg-gray-200 rounded">
+        <div class="h-2 bg-green-600 rounded" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+export default function AlumnosTable({ rows = [], onEdit, onRequestDelete, onRequestCascade, deletingId, cascadeDeletingId, asistenciasStats, loadingAsistenciasStats }) {
   return (
     <div class="hidden sm:block overflow-x-auto">
       <table class="w-full text-sm">
@@ -9,6 +35,7 @@ export default function AlumnosTable({ rows = [], onEdit, onRequestDelete, onReq
             <th class="px-4 py-2 text-left">Curso</th>
             <th class="px-4 py-2 text-left">Teléfono</th>
             <th class="px-4 py-2 text-left">Clases</th>
+            <th class="px-4 py-2 text-left">Restantes</th>
             <th class="px-4 py-2 text-left">Horas</th>
             <th class="px-4 py-2 text-left">Acciones</th>
           </tr>
@@ -21,6 +48,9 @@ export default function AlumnosTable({ rows = [], onEdit, onRequestDelete, onReq
               <td class="px-4 py-2">{alumno.curso || 'N/A'}</td>
               <td class="px-4 py-2">{alumno.telefono_padre || 'N/A'}</td>
               <td class="px-4 py-2">{alumno.clases_compradas || 0}</td>
+              <td class="px-4 py-2">
+                <ProgressCell alumno={alumno} asistenciasStats={asistenciasStats} loadingAsistenciasStats={loadingAsistenciasStats} />
+              </td>
               <td class="px-4 py-2">{alumno.horas || 'N/A'}</td>
               <td class="px-4 py-2 flex gap-2 items-center">
                 <button

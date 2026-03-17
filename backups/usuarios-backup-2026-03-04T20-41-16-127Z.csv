@@ -1,0 +1,5 @@
+"id_usuario","id_alumno","email","password","rol"
+"admin_01","","admin@clasesapoyo.com","admin123","admin"
+"u_1770418779170","1","test@example.com","123456","padre"
+"u_1770515733697","2","diego@clasesapoyo.com","diego123","padre"
+"u_1772564761769","7","matias@clasesdeapoyo.com","matias123","padre"

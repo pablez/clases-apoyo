@@ -1,0 +1,83 @@
+@startuml Gestor Asistencia - Database Schema
+
+!theme plain
+skinparam linetype ortho
+skinparam packageStyle rectangle
+
+title Gestor de Asistencia - Diagrama de Base de Datos\n(Relación 1:N Usuario-Alumnos)
+
+entity "usuarios" {
+  * id_usuario : VARCHAR <<PK>>
+  --
+  email : VARCHAR
+  password : VARCHAR
+  rol : VARCHAR
+  alumnos_ids : TEXT
+  --
+  Ejemplo alumnos_ids: "1,2,3"
+}
+
+entity "alumnos" {
+  * id_alumno : VARCHAR <<PK>>
+  --
+  nombre : VARCHAR
+  edad : INT
+  curso : VARCHAR
+  telefono_padre : VARCHAR
+  materias : TEXT
+  clases_compradas : INT
+  horas : INT
+  id_usuario : VARCHAR <<FK>> (LEGACY - to be removed)
+}
+
+entity "asistencias" {
+  * id_asistencia : VARCHAR <<PK>>
+  --
+  * id_alumno : VARCHAR <<FK>>
+  fecha : DATE
+  hora : TIME
+  estado : VARCHAR
+  observaciones : TEXT
+}
+
+entity "materiales" {
+  * id : VARCHAR <<PK>>
+  --
+  materia : VARCHAR
+  nivel : VARCHAR
+  grado : VARCHAR
+  titulo : VARCHAR
+  descripcion : TEXT
+  url_recurso : VARCHAR
+  imagen_url : VARCHAR
+}
+
+' Relaciones principales
+usuarios ||--o{ alumnos : "1:N via alumnos_ids"
+alumnos ||--o{ asistencias : "1:N"
+
+' Relación conceptual con materiales (no hay FK directa)
+materiales ..> alumnos : "usado por materias"
+
+note right of usuarios
+  **Cambio clave:**
+  - alumnos_ids: Campo CSV/JSON con IDs
+  - Un usuario puede tener múltiples alumnos
+  - Eliminar dependencia de id_usuario en alumnos
+end note
+
+note right of alumnos
+  **Legacy Field:**
+  id_usuario debe ser eliminado
+  La relación se mantiene via 
+  usuarios.alumnos_ids
+end note
+
+note bottom of asistencias
+  **Consultas:**
+  - Por alumno individual
+  - Por múltiples alumnos (usuario padre)
+  - Filtros: fecha, estado, etc.
+end note
+
+@enduml

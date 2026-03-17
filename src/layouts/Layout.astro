@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import Navbar from '../components/Navbar.astro';
+import Toasts from '../components/Toasts.jsx';
 const { title = 'Gestor Asistencia' } = Astro.props;
 ---
 <!doctype html>
@@ -15,6 +16,7 @@ const { title = 'Gestor Asistencia' } = Astro.props;
     <main class="container mx-auto px-4 py-8">
       <slot />
     </main>
+    <div id="global-toasts-root"></div>
     <!-- PWA service worker unregister script removed: project no longer supports PWA -->
   </body>
 </html>

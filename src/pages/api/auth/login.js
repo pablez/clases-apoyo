@@ -41,10 +41,10 @@ export async function POST({ request }) {
           const alumno = body && body.alumno ? body.alumno : null;
           const adminPayload = {
             id_usuario: `admin_auto_${Date.now()}`,
-            id_alumno: alumno ? String(alumno.id || alumno.id_alumno || '') : '',
             email: (alumno && (alumno.email || alumno.correo)) || `admin@local.${Date.now()}`,
             password: '',
-            rol: 'admin'
+            rol: 'admin',
+            alumnos_ids: alumno ? [String(alumno.id || '')] : [] // Use new multi-alumno structure
           };
           try {
             const created = await usuariosRepo.createUsuario(adminPayload);

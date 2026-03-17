@@ -2,22 +2,23 @@ import { readSheetRange, appendSheetRange, updateSheetRange, rowsToObjects } fro
 
 /** Sheets adapter for Alumnos (minimal implementation) */
 export async function getAlumnos() {
-  const rows = await readSheetRange('Alumnos!A1:H100');
+  // read alumnos including new id_usuario column (A:I)
+  const rows = await readSheetRange('Alumnos!A1:I100');
   const objs = rowsToObjects(rows);
-  // Also read Usuarios sheet to attach user info (email/rol/password) when available
-  let usuariosMap = {};
+  // Read Usuarios sheet and build maps for compatibility:
+  // - usuariosById: key = id_usuario
+  // - usuariosByAlumno: key = id_alumno (legacy)
+  const usuariosById = {};
+  const usuariosByAlumno = {};
   try {
     const urows = await readSheetRange('Usuarios!A1:E100');
     const uobjs = rowsToObjects(urows);
     uobjs.forEach(u => {
-      const alumnoId = u.id_alumno || u.id || u.idAlumno || '';
-      if (alumnoId) {
-        // Sanitize usuario object: do not expose internal id_usuario or password to client
-        usuariosMap[String(alumnoId)] = {
-          email: u.email || u.correo || '',
-          rol: u.rol || 'padre'
-        };
-      }
+      const idUsuario = u.id_usuario || u.id || u.idUsuario || '';
+      const alumnoId = u.id_alumno || u.idAlumno || u.alumno || '';
+      const sanitized = { email: u.email || u.correo || '', rol: u.rol || 'padre' };
+      if (idUsuario) usuariosById[String(idUsuario)] = sanitized;
+      if (alumnoId) usuariosByAlumno[String(alumnoId)] = sanitized;
     });
   } catch (e) {
     // ignore if Usuarios sheet not present
@@ -25,9 +26,11 @@ export async function getAlumnos() {
 
   return objs.map(o => {
     const alumnoId = o.id_alumno || o.id || o.idAlumno || '';
-    const usuario = usuariosMap[String(alumnoId)];
+    const idUsuario = o.id_usuario || o.idUsuario || '';
+    // prefer lookup by id_usuario, fallback to legacy id_alumno lookup
+    const usuario = (idUsuario && usuariosById[String(idUsuario)]) || usuariosByAlumno[String(alumnoId)] || null;
     const materiasVal = Array.isArray(o.materias) ? o.materias.join(', ') : (o.materias || '');
-      return {
+    return {
       id: alumnoId,
       nombre: o.nombre || '',
       edad: o.edad || '',
@@ -46,28 +49,33 @@ export async function getAlumnos() {
 
 export async function createAlumno(payload) {
   // payload: { nombre, edad, curso, telefono_padre, materias, clases_compradas, horas }
-  const rows = await readSheetRange('Alumnos!A1:H100');
+  const rows = await readSheetRange('Alumnos!A1:I100');
   const objs = rowsToObjects(rows);
   const ids = objs.map(o => parseInt(o.id_alumno || o.id || 0) || 0);
   const newId = String(Math.max(0, ...ids) + 1);
   const materiasVal = Array.isArray(payload.materias) ? payload.materias.join(', ') : (payload.materias || '');
-  const row = [newId, payload.nombre || '', payload.edad || '', payload.curso || '', payload.telefono_padre || '', materiasVal, payload.clases_compradas || '', payload.horas || ''];
-  const result = await appendSheetRange('Alumnos!A:H', [row]);
-  // Si el payload trae credenciales para usuario, agregar fila en hoja "Usuarios"
+  
+  // Si el payload trae credenciales para usuario, generar id_usuario ANTES de crear la fila de alumno
+  let idUsuarioFinal = payload.id_usuario || payload.idUsuario || '';
   let usuarioResult = null;
+  
   if (payload.email) {
-    // id_usuario simplificado: prefijo 'u_' + timestamp
-    const idUsuario = `u_${Date.now()}`;
-    const usuarioRow = [idUsuario, newId, payload.email || '', payload.password || '', payload.rol || 'padre'];
+    // Generar id_usuario único
+    idUsuarioFinal = `u_${Date.now()}`;
+    const usuarioRow = [idUsuarioFinal, newId, payload.email || '', payload.password || '', payload.rol || 'padre'];
     usuarioResult = await appendSheetRange('Usuarios!A:E', [usuarioRow]);
   }
+  
+  // Crear fila de alumno con el id_usuario correcto
+  const row = [newId, payload.nombre || '', payload.edad || '', payload.curso || '', payload.telefono_padre || '', materiasVal, payload.clases_compradas || '', payload.horas || '', idUsuarioFinal];
+  const result = await appendSheetRange('Alumnos!A:I', [row]);
 
-  return { id: newId, ...payload, _appendResult: result, _usuarioAppend: usuarioResult };
+  return { id: newId, ...payload, id_usuario: idUsuarioFinal, _appendResult: result, _usuarioAppend: usuarioResult };
 }
 
 export async function updateAlumno(id, payload) {
   // Leer todas las filas para localizar la fila del alumno
-  const range = 'Alumnos!A1:H100';
+  const range = 'Alumnos!A1:I100';
   const rows = await readSheetRange(range);
   if (!rows || rows.length === 0) throw new Error('Alumnos sheet empty');
 
@@ -80,18 +88,21 @@ export async function updateAlumno(id, payload) {
 
   // Build updated row values in same column order as createAlumno
   const materiasVal = Array.isArray(payload.materias) ? payload.materias.join(', ') : (payload.materias || bodyRows[idx][5] || '');
+  const idUsuarioExisting = (bodyRows[idx] && bodyRows[idx][8]) || '';
+  const idUsuarioVal = (payload.id_usuario ?? payload.idUsuario ?? idUsuarioExisting) || '';
   const newRow = [
     String(id),
-    (payload.nombre ?? bodyRows[idx][1]) || '',
-    (payload.edad ?? bodyRows[idx][2]) || '',
-    (payload.curso ?? bodyRows[idx][3]) || '',
-    (payload.telefono_padre ?? bodyRows[idx][4]) || '',
+    payload.nombre ?? bodyRows[idx][1] ?? '',
+    payload.edad ?? bodyRows[idx][2] ?? '',
+    payload.curso ?? bodyRows[idx][3] ?? '',
+    payload.telefono_padre ?? bodyRows[idx][4] ?? '',
     materiasVal,
-    (payload.clases_compradas ?? bodyRows[idx][6]) || '',
-    (payload.horas ?? bodyRows[idx][7]) || ''
+    payload.clases_compradas ?? bodyRows[idx][6] ?? '',
+    payload.horas ?? bodyRows[idx][7] ?? '',
+    idUsuarioVal
   ];
 
-  await updateSheetRange(`Alumnos!A${sheetRowNumber}:H${sheetRowNumber}`, [newRow]);
+  await updateSheetRange(`Alumnos!A${sheetRowNumber}:I${sheetRowNumber}`, [newRow]);
 
   // Si payload incluye datos de usuario, actualizar o crear fila en Usuarios
   if (payload.email || payload.password || payload.rol) {
@@ -127,7 +138,7 @@ export async function updateAlumno(id, payload) {
 
 export async function deleteAlumno(id) {
   // Leer todas las filas para localizar la fila del alumno y reescribir la hoja sin esa fila
-  const alumnosRange = 'Alumnos!A1:H100';
+  const alumnosRange = 'Alumnos!A1:I100';
   const alumnosRows = await readSheetRange(alumnosRange);
   if (!alumnosRows || alumnosRows.length === 0) throw new Error('Alumnos sheet empty');
 
@@ -144,7 +155,7 @@ export async function deleteAlumno(id) {
   while (newAlumnosRows.length < originalAlumnosLen) {
     newAlumnosRows.push(new Array(alumnosHeaders.length).fill(''));
   }
-  await updateSheetRange(`Alumnos!A1:H${originalAlumnosLen}`, newAlumnosRows);
+  await updateSheetRange(`Alumnos!A1:I${originalAlumnosLen}`, newAlumnosRows);
 
   // Eliminar asistencias asociadas (Asistencias!A1:F100)
   try {

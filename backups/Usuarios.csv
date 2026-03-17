@@ -1,0 +1,10 @@
+id_usuario,email,password,rol,alumnos_ids
+admin_01,admin@clasesapoyo.com,admin123,admin,
+u_1770418779170,test@example.com,123456,padre,1
+u_1770515733697,diego@clasesapoyo.com,diego123,padre,2
+u_1772564761769,matias@clasesdeapoyo.com,matias123,padre,7
+u_1772675894744,padreprueba@clasesapoyo.com,,padre,8
+u_1772677733999,rosalinda@clasesapoyo.com,rosalinda123,padre,9
+u_1772841721336,uriel@clasesapoyo.com,uriel123,padre,10
+u_1773084737803,veronica@clasesapoyo.com,veronica123,padre,11
+u_1773170420365,alex@clasesapoyo.com,alex123,padre,12

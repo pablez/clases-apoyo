@@ -1,0 +1,7 @@
+id_alumno,nombre,edad,curso,telefono_padre,materias,clases_compradas,horas,id_usuario
+4,Joshua Samuel Vidaurre Beltran,14,3ro de Secundaria,61597405,,12,2,
+7,Robin Matias Chávez Sarabia,8,4to de primaria ,,"Matemáticas, Lectura, escritura",8,1,
+9,Rosalinda Chura Montero,13,1ro de secundaria,63851983,Matematicas,4,2,u_1772677733999
+10,Uriel Carlos Vargas Ali,8,3ro de primaria ,75158569,"Lectura, escritura",12,1,u_1772841721336
+11,Alexandra Karlos,15,6to de secundaria ,76430047,Matemáticas,10,1,u_1773084737803
+12,Alex Mamani Choque,17,6to de secundaria ,74808595,"Física, matemáticas, quimica",12,1,u_1773170420365

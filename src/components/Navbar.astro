@@ -94,7 +94,7 @@
         const t = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
         if (t) init = { headers: { Authorization: `Bearer ${t}` } };
       } catch(e){}
-      const resp = await fetch('/api/alumno/asistencias', init);
+      const resp = await fetch('/api/auth/verify', init);
     // reuse existing `el`/`container` variables
     el = el || document.getElementById('nav-auth-link');
     elMobile = elMobile || document.getElementById('nav-auth-link-mobile');
@@ -103,14 +103,37 @@
     if (!el) return;
     container = container || el.parentElement;
     if (resp.ok) {
-      el.href = '/alumno';
-      el.textContent = 'Ver asistencia';
-      if (elMobile) { elMobile.href = '/alumno'; elMobile.textContent = 'Ver asistencia'; }
       try {
         const body = await resp.json();
-        if (statusEl) statusEl.textContent = body && body.alumno && body.alumno.nombre ? `Conectado como ${body.alumno.nombre}` : '';
-        if (statusElMobile) statusElMobile.textContent = body && body.alumno && body.alumno.nombre ? `Conectado como ${body.alumno.nombre}` : '';
-      } catch(e) { if (statusEl) statusEl.textContent = ''; }
+        if (!body.authenticated) {
+          // Not authenticated, show login link
+          el.href = '/login';
+          el.textContent = 'Iniciar sesión';
+          if (elMobile) { elMobile.href = '/login'; elMobile.textContent = 'Iniciar sesión'; }
+          if (statusEl) statusEl.textContent = '';
+          if (statusElMobile) statusElMobile.textContent = '';
+          return;
+        }
+        
+        // User is authenticated
+        if (body.isAdmin) {
+          el.href = '/admin';
+          el.textContent = 'Panel de admin';
+          if (elMobile) { elMobile.href = '/admin'; elMobile.textContent = 'Panel de admin'; }
+        } else {
+          el.href = '/alumno';
+          el.textContent = 'Ver asistencia';
+          if (elMobile) { elMobile.href = '/alumno'; elMobile.textContent = 'Ver asistencia'; }
+        }
+        
+        // Show user status
+        const userName = body.user && body.user.nombre ? body.user.nombre : 'Usuario';
+        if (statusEl) statusEl.textContent = `Conectado como ${userName}`;
+        if (statusElMobile) statusElMobile.textContent = `Conectado como ${userName}`;
+      } catch(e) { 
+        if (statusEl) statusEl.textContent = ''; 
+        if (statusElMobile) statusElMobile.textContent = '';
+      }
       // add logout button if not present (desktop)
       if (!document.getElementById('nav-logout-btn')) {
         const btn = document.createElement('button');

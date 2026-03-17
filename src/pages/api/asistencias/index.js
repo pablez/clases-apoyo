@@ -1,17 +1,13 @@
 export const prerender = false;
 
-async function resolveRepo() {
-  const useSheets = process.env.USE_GOOGLE_SHEETS === 'true';
-  if (useSheets) return import('../../../infrastructure/sheets/asistencias.js');
-  return import('../../../infrastructure/mock/index.js');
-}
+import { getContainer } from '../../../infrastructure/container.js';
 
 export async function GET({ url }) {
   try {
     const alumnoId = url.searchParams.get('alumnoId');
     const format = url.searchParams.get('format') || 'json';
-    const repo = await resolveRepo();
-    const data = await repo.getAsistencias(alumnoId);
+    const { repositories } = getContainer();
+    const data = await repositories.asistenciasRepository.list(alumnoId);
     if (format === 'plain') {
       // Concatenate records as: id + fecha(dd/mm/yyyy) + hora + estado + observaciones
       const fmtDate = (d) => {
@@ -35,12 +31,10 @@ export async function GET({ url }) {
 export async function POST({ request }) {
   try {
     const body = await request.json();
-    console.log('📝 Creando asistencia:', body);
-    const repo = await resolveRepo();
-    const data = await repo.createAsistencia(body);
+    const { repositories } = getContainer();
+    const data = await repositories.asistenciasRepository.create(body);
     return new Response(JSON.stringify(data), { status: 201, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
-    console.error('❌ Error al crear asistencia:', error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

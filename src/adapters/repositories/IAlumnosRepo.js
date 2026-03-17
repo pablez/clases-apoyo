@@ -1,22 +1,11 @@
 /**
  * Interfaz `IAlumnosRepo` - contrato esperado para repositorios de Alumnos.
- * Implementaciones deben proporcionar las funciones listadas a continuación.
- * Este archivo es documentación ejecutable; no exporta implementación.
+ * Implementaciones concretas (Sheets, Mock, DB) deben exponer estos métodos.
  */
 
-/**
- * getAll(): Promise<Array>
- * getById(id): Promise<Object|null>
- * create(payload): Promise<Object>
- * update(id, payload): Promise<Object>
- * delete(id): Promise<Object>
- */
-
-export default {};
 /**
  * Interfaz / contrato para el repositorio de Alumnos (ESM).
- * Implementaciones concretas (Sheets, Mock, DB) deben exponer estos métodos.
- * Este archivo no es una implementación ejecutable, sirve como guía/contrato.
+ * Esta clase actúa como contrato base para inyección de dependencias.
  */
 
 /**

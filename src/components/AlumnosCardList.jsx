@@ -1,4 +1,29 @@
-export default function AlumnosCardList({ rows = [], onEdit, onRequestDelete, onRequestCascade, expandedId, setExpandedId, deletingId, cascadeDeletingId }) {
+function ProgressMini({ alumno, asistenciasStats, loadingAsistenciasStats }) {
+  const total = Number(alumno.clases_compradas || 0) || 0;
+  const presentes = Number(asistenciasStats?.[String(alumno.id)]?.presentes || 0) || 0;
+  const consumidas = Math.min(total, presentes);
+  const restantes = Math.max(0, total - presentes);
+  const pct = total > 0 ? Math.round((consumidas / total) * 100) : 0;
+
+  if (loadingAsistenciasStats) {
+    return <div class="h-2 w-28 bg-gray-100 rounded animate-pulse" />;
+  }
+  if (!total) return <span class="text-xs text-gray-500">—</span>;
+
+  return (
+    <div class="w-full">
+      <div class="flex items-center justify-between text-[11px] text-gray-600 mb-1">
+        <span>{restantes} restantes</span>
+        <span>{pct}%</span>
+      </div>
+      <div class="h-2 w-full bg-gray-200 rounded">
+        <div class="h-2 bg-green-600 rounded" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+export default function AlumnosCardList({ rows = [], onEdit, onRequestDelete, onRequestCascade, expandedId, setExpandedId, deletingId, cascadeDeletingId, asistenciasStats, loadingAsistenciasStats }) {
   return (
     <div class="block sm:hidden space-y-3">
       {rows.map(alumno => (
@@ -12,6 +37,9 @@ export default function AlumnosCardList({ rows = [], onEdit, onRequestDelete, on
             </div>
             <div class="flex flex-col items-end gap-2">
               <div class="text-sm font-medium text-gray-700">{alumno.clases_compradas || 0} clases</div>
+              <div class="w-full min-w-[160px]">
+                <ProgressMini alumno={alumno} asistenciasStats={asistenciasStats} loadingAsistenciasStats={loadingAsistenciasStats} />
+              </div>
               <div class="flex gap-2 flex-wrap">
                 <button aria-label="Editar" onClick={() => onEdit && onEdit(alumno)} class="px-3 py-1 min-w-[44px] bg-blue-600 text-white rounded text-xs" disabled={deletingId === alumno.id}>✏️</button>
                 <button aria-label="Eliminar" onClick={() => onRequestDelete && onRequestDelete(alumno.id)} class="px-3 py-1 min-w-[44px] bg-red-600 text-white rounded text-xs" disabled={deletingId === alumno.id}>{deletingId === alumno.id ? '...' : '🗑️'}</button>

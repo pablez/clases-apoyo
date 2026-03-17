@@ -202,6 +202,23 @@ export async function createUsuario(payload) {
   return payload;
 }
 
+export async function updateUsuario(id, payload) {
+  const mock = await readMock();
+  mock.usuarios = mock.usuarios || [];
+  const idx = mock.usuarios.findIndex(u => String(u.id_usuario || u.id || '') === String(id));
+  if (idx === -1) throw new Error('Usuario no encontrado');
+  mock.usuarios[idx] = { ...mock.usuarios[idx], ...payload };
+  await writeMock(mock);
+  return mock.usuarios[idx];
+}
+
+export async function deleteUsuario(id) {
+  const mock = await readMock();
+  mock.usuarios = (mock.usuarios || []).filter(u => String(u.id_usuario || u.id || '') !== String(id));
+  await writeMock(mock);
+  return { success: true };
+}
+
 export default {
   getAlumnos,
   createAlumno,
@@ -219,4 +236,6 @@ export default {
   deleteMaterial,
   getUsuarios,
   createUsuario,
+  updateUsuario,
+  deleteUsuario,
 };

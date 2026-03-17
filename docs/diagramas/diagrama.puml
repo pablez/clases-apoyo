@@ -1,0 +1,45 @@
+@startuml
+skinparam monochrome true
+skinparam classAttributeIconSize 0
+
+class Alumno {
+    - id_alumno: String
+    - nombre: String
+    - edad: Integer
+    - curso: String
+    - telefono_padre: String
+    - materias: List<String>
+    - clases_compradas: Integer
+    + calcularClasesRestantes(asistencias: List): Integer
+}
+
+class Asistencia {
+    - id_asistencia: String
+    - id_alumno: String
+    - fecha: Date
+    - hora: Time
+    - estado: EstadoAsistencia
+    - observaciones: String
+    + actualizarEstado(nuevoEstado: EstadoAsistencia): void
+}
+
+class Material {
+    - id_material: String
+    - materia: String
+    - titulo: String
+    - descripcion: String
+    - url_recurso: String
+    - imagen_url: String
+}
+
+enum EstadoAsistencia {
+    PRESENTE
+    FALTA
+    MODIFICADO
+    PENDIENTE
+}
+
+Alumno "1" *-- "0..*" Asistencia : registra >
+Material "0..*" --o "1" Alumno : consultado_por <
+
+@enduml

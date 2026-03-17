@@ -52,15 +52,37 @@ export default function LoginForm({ apiBaseUrl = '/api' }) {
       } catch (e) {
         // ignore storage errors
       }
-      // If user is admin (from Usuarios sheet) redirect to admin panel
+      // If user is admin redirect to admin panel - check multiple possible locations for rol
       try {
-        const isAdmin = data && data.alumno && data.alumno._usuario && String(data.alumno._usuario.rol || '').toLowerCase() === 'admin';
+        let isAdmin = false;
+        
+        // Check if alumno has rol directly
+        if (data && data.alumno && data.alumno.rol) {
+          isAdmin = String(data.alumno.rol).toLowerCase() === 'admin';
+        }
+        
+        // Check if alumno has _usuario.rol (backwards compatibility)
+        if (!isAdmin && data && data.alumno && data.alumno._usuario && data.alumno._usuario.rol) {
+          isAdmin = String(data.alumno._usuario.rol).toLowerCase() === 'admin';
+        }
+        
+        // Additional check: if email matches known admin emails
+        if (!isAdmin && data && data.alumno && data.alumno.email) {
+          const adminEmails = ['admin@clasesapoyo.com'];
+          isAdmin = adminEmails.includes(data.alumno.email.toLowerCase());
+        }
+        
         if (isAdmin) {
-          try { sessionStorage.setItem('admin_auth', 'true'); localStorage.setItem('admin_auth', 'true'); } catch(e) {}
+          try { 
+            sessionStorage.setItem('admin_auth', 'true'); 
+            localStorage.setItem('admin_auth', 'true'); 
+          } catch(e) {}
           window.location.href = '/admin';
           return;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Admin verification error in login:', e.message);
+      }
       window.location.href = '/alumno';
     } catch (e) {
       setError(e.message);

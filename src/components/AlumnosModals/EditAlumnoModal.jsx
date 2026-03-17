@@ -1,6 +1,8 @@
 import { h } from 'preact';
+import useUsuarios from '../../hooks/useUsuarios.js';
 
 export default function EditAlumnoModal({ visible, formData, setFormData, formErrors, onClose, editActiveTab, setEditActiveTab, handleSave, saving, resetForm }) {
+  const { usuarios } = useUsuarios('/api');
   if (!visible) return null;
   return (
     <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
@@ -26,7 +28,20 @@ export default function EditAlumnoModal({ visible, formData, setFormData, formEr
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">Edad</label>
-              <input type="number" value={formData.edad} onInput={(e) => setFormData({ ...formData, edad: e.target.value })} class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" placeholder="18" />
+              <input 
+                type="number" 
+                min="1" 
+                max="100" 
+                value={formData.edad || ''} 
+                onInput={(e) => {
+                  const numValue = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                  if (isNaN(numValue) || numValue < 0) return;
+                  setFormData({ ...formData, edad: numValue });
+                }} 
+                class={`w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 ${formErrors.edad ? 'border-red-500' : ''}`} 
+                placeholder="18" 
+              />
+              {formErrors.edad && <p class="text-sm text-red-600 mt-1">{formErrors.edad}</p>}
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">Curso</label>
@@ -34,19 +49,58 @@ export default function EditAlumnoModal({ visible, formData, setFormData, formEr
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">Teléfono Padre</label>
-              <input type="text" value={formData.telefono_padre} onInput={(e) => setFormData({ ...formData, telefono_padre: e.target.value })} class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" placeholder="+591 74325440" />
+              <input 
+                type="tel" 
+                value={formData.telefono_padre} 
+                onInput={(e) => setFormData({ ...formData, telefono_padre: e.target.value })} 
+                class={`w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 ${formErrors.telefono_padre ? 'border-red-500' : ''}`} 
+                placeholder="+591 74325440" 
+              />
+              {formErrors.telefono_padre && <p class="text-sm text-red-600 mt-1">{formErrors.telefono_padre}</p>}
             </div>
             <div class="md:col-span-2">
+              <label class="block text-sm font-medium mb-1">Asignar Usuario (opcional)</label>
+              <select value={formData.id_usuario || ''} onInput={(e) => setFormData({ ...formData, id_usuario: e.target.value })} class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 mb-3">
+                <option value="">-- Ninguno --</option>
+                {(usuarios || []).map(u => (
+                  <option value={u.id_usuario || u.id || ''}>{u.email || (u.id_usuario || u.id)}</option>
+                ))}
+              </select>
               <label class="block text-sm font-medium mb-1">Materias (separadas por comas)</label>
               <input type="text" value={formData.materias} onInput={(e) => setFormData({ ...formData, materias: e.target.value })} class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" placeholder="Matemáticas, Física" />
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">Clases Compradas</label>
-              <input type="number" value={formData.clases_compradas} onInput={(e) => setFormData({ ...formData, clases_compradas: e.target.value })} class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" placeholder="12" />
+              <input 
+                type="number" 
+                min="0" 
+                value={formData.clases_compradas || ''} 
+                onInput={(e) => {
+                  const numValue = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                  if (isNaN(numValue) || numValue < 0) return;
+                  setFormData({ ...formData, clases_compradas: numValue });
+                }} 
+                class={`w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 ${formErrors.clases_compradas ? 'border-red-500' : ''}`} 
+                placeholder="12" 
+              />
+              {formErrors.clases_compradas && <p class="text-sm text-red-600 mt-1">{formErrors.clases_compradas}</p>}
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">Horas por Clase</label>
-              <input type="text" value={formData.horas} onInput={(e) => setFormData({ ...formData, horas: e.target.value })} class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" placeholder="2 horas" />
+              <input 
+                type="number" 
+                min="0" 
+                step="0.5" 
+                value={formData.horas || ''} 
+                onInput={(e) => {
+                  const numValue = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                  if (isNaN(numValue) || numValue < 0) return;
+                  setFormData({ ...formData, horas: numValue });
+                }} 
+                class={`w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 ${formErrors.horas ? 'border-red-500' : ''}`} 
+                placeholder="2" 
+              />
+              {formErrors.horas && <p class="text-sm text-red-600 mt-1">{formErrors.horas}</p>}
             </div>
             <div class="md:col-span-2 flex justify-end gap-2 mt-4">
               <button type="button" onClick={() => { onClose(); resetForm(); }} class="px-6 py-2 rounded font-medium bg-gray-400 hover:bg-gray-500 text-white">Cancelar</button>

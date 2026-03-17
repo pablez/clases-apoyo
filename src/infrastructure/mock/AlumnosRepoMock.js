@@ -37,7 +37,32 @@ export default class AlumnosRepoMock {
   async findByEmail(email) {
     const mock = readMock();
     const list = mock.alumnos || [];
-    return list.find(a => String(a.id) === String(email) || (a.email && a.email === email) || a.nombre === email) || null;
+    
+    // First, try to find in alumnos
+    const alumno = list.find(a => String(a.id) === String(email) || (a.email && a.email === email) || a.nombre === email);
+    if (alumno) return alumno;
+    
+    // If not found in alumnos, try to find in usuarios
+    const usuarios = mock.usuarios || [];
+    const usuario = usuarios.find(u => u.email === email);
+    if (usuario) {
+      // Return user data in alumno-like format for compatibility with login flow
+      return {
+        id: usuario.id_usuario || usuario.id,
+        id_alumno: usuario.id_usuario || usuario.id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        password: usuario.password,
+        rol: usuario.rol,
+        _usuario: {
+          email: usuario.email,
+          rol: usuario.rol,
+          password: usuario.password
+        }
+      };
+    }
+    
+    return null;
   }
 
   async create(payload) {

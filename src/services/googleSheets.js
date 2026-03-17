@@ -3,10 +3,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 
-const DEFAULT_GOOGLE_SHEET_ID = '13MCWCQV1VL9PBzByW-mJo0mbenYSeX_OTf9MJVwDO10';
-const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || DEFAULT_GOOGLE_SHEET_ID;
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || '';
 let GOOGLE_SERVICE_ACCOUNT_KEY_PATH = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || '';
-let GOOGLE_SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '';
+let GOOGLE_SERVICE_ACCOUNT_JSON =
+  process.env.GOOGLE_SERVICE_ACCOUNT_JSON ||
+  process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 ||
+  '';
 
 // Detectar credencial local por defecto si existe en el repo (educacion-llave.json)
 try {
@@ -26,21 +28,28 @@ try {
   // ignore
 }
 
-// Validación inicial de configuración
-console.log('🔧 Configuración de Google Sheets:');
-const sheetIdDisplay = GOOGLE_SHEET_ID
-  ? `${GOOGLE_SHEET_ID.substring(0, 10)}...` + (GOOGLE_SHEET_ID === DEFAULT_GOOGLE_SHEET_ID ? ' (USANDO ID POR DEFECTO)' : '')
-  : '❌ NO DEFINIDO';
-console.log('  GOOGLE_SHEET_ID:', sheetIdDisplay);
-console.log('  GOOGLE_SERVICE_ACCOUNT_JSON:', GOOGLE_SERVICE_ACCOUNT_JSON ? `✅ Definido (${GOOGLE_SERVICE_ACCOUNT_JSON.length} caracteres)` : '❌ No definido');
-console.log('  GOOGLE_SERVICE_ACCOUNT_KEY_PATH:', GOOGLE_SERVICE_ACCOUNT_KEY_PATH ? `✅ ${GOOGLE_SERVICE_ACCOUNT_KEY_PATH}` : '❌ No definido');
-
-if (!GOOGLE_SHEET_ID) {
-  console.error('❌ ADVERTENCIA: GOOGLE_SHEET_ID no está configurado');
+function isProbablyBase64(value) {
+  if (!value) return false;
+  const s = String(value).trim();
+  if (s.startsWith('{')) return false;
+  if (s.length < 16) return false;
+  return /^[A-Za-z0-9+/=]+$/.test(s);
 }
 
-if (!GOOGLE_SERVICE_ACCOUNT_JSON && !GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
-  console.error('❌ ADVERTENCIA: No se encontraron credenciales de Google (ni JSON ni KEY_PATH)');
+function decodeServiceAccountJson(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('{')) return raw;
+  if (isProbablyBase64(raw)) {
+    try {
+      const decoded = Buffer.from(raw, 'base64').toString('utf8').trim();
+      if (decoded.startsWith('{')) return decoded;
+      return raw;
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
 }
 
 let sheetsClient = null;
@@ -56,25 +65,19 @@ async function getGoogleSheetsClient() {
 
   // OPCIÓN 1: Credenciales desde variable de entorno (PRODUCCIÓN - Netlify)
   if (GOOGLE_SERVICE_ACCOUNT_JSON) {
-    console.log('🔑 Usando credenciales desde variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON');
-    console.log('📏 Longitud del JSON:', GOOGLE_SERVICE_ACCOUNT_JSON.length);
     try {
-      const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
-      console.log('✅ JSON parseado correctamente');
-      console.log('📧 Service account email:', credentials.client_email);
-      console.log('🔑 Project ID:', credentials.project_id);
+      const json = decodeServiceAccountJson(GOOGLE_SERVICE_ACCOUNT_JSON);
+      const credentials = JSON.parse(json);
       auth = new google.auth.GoogleAuth({
         credentials,
         scopes: ['https://www.googleapis.com/auth/spreadsheets'],
       });
     } catch (error) {
-      console.error('❌ Error al parsear GOOGLE_SERVICE_ACCOUNT_JSON:', error.message);
       throw new Error(`Error al parsear GOOGLE_SERVICE_ACCOUNT_JSON: ${error.message}`);
     }
   }
   // OPCIÓN 2: Credenciales desde archivo (DESARROLLO - local)
   else if (GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
-    console.log('🔑 Usando credenciales desde archivo:', GOOGLE_SERVICE_ACCOUNT_KEY_PATH);
     const keyPath = path.isAbsolute(GOOGLE_SERVICE_ACCOUNT_KEY_PATH) 
       ? GOOGLE_SERVICE_ACCOUNT_KEY_PATH 
       : path.resolve(process.cwd(), GOOGLE_SERVICE_ACCOUNT_KEY_PATH);
@@ -103,8 +106,6 @@ async function getGoogleSheetsClient() {
  * @returns {Promise<Array>} Array de arrays con los valores
  */
 export async function readSheetRange(range) {
-  console.log(`📖 Leyendo rango: ${range} del Sheet ID: ${GOOGLE_SHEET_ID}`);
-  
   try {
     const sheets = await getGoogleSheetsClient();
     const response = await sheets.spreadsheets.values.get({
@@ -113,20 +114,8 @@ export async function readSheetRange(range) {
     });
     
     const values = response.data.values || [];
-    console.log(`✅ Rango leído exitosamente: ${values.length} filas`);
-    
-    if (values.length === 0) {
-      console.warn(`⚠️ El rango ${range} está vacío`);
-    }
-    
     return values;
   } catch (error) {
-    console.error(`❌ Error al leer rango ${range}:`, error.message);
-    
-    // Detalles adicionales del error
-    if (error.code) console.error('Código de error:', error.code);
-    if (error.errors) console.error('Errores:', error.errors);
-    
     throw new Error(`Error al leer Google Sheets (${range}): ${error.message}`);
   }
 }
@@ -137,8 +126,6 @@ export async function readSheetRange(range) {
  * @param {Array} values - Array de arrays con valores a escribir
  */
 export async function updateSheetRange(range, values) {
-  console.log(`✏️ Actualizando rango: ${range}`);
-  
   try {
     const sheets = await getGoogleSheetsClient();
     const response = await sheets.spreadsheets.values.update({
@@ -147,13 +134,10 @@ export async function updateSheetRange(range, values) {
       valueInputOption: 'USER_ENTERED',
       requestBody: { values },
     });
-    
-    console.log(`✅ Rango actualizado: ${response.data.updatedCells} celdas`);
     return response.data;
   } catch (error) {
-    console.error(`❌ Error al actualizar rango ${range}:`, error.message);
     throw new Error(`Error al actualizar Google Sheets (${range}): ${error.message}`);
-  }  return response.data;
+  }
 }
 
 /**
@@ -162,7 +146,6 @@ export async function updateSheetRange(range, values) {
  * @param {Array} values - Array de arrays con las filas a añadir
  */
 export async function appendSheetRange(range, values) {
-  console.log(`✳️ Appending rango: ${range}`);
   try {
     const sheets = await getGoogleSheetsClient();
     const response = await sheets.spreadsheets.values.append({
@@ -172,10 +155,8 @@ export async function appendSheetRange(range, values) {
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values },
     });
-    console.log('✅ Append exitoso');
     return response.data;
   } catch (error) {
-    console.error(`❌ Error al hacer append ${range}:`, error.message);
     throw new Error(`Error al append en Google Sheets (${range}): ${error.message}`);
   }
 }
@@ -198,8 +179,8 @@ export function rowsToObjects(rows) {
 
 /**
  * Lee la hoja `Usuarios` y la convierte a objetos.
- * Se espera que la primera fila contenga encabezados como:
- * id_usuario, id_alumno, email, rol
+ * Nueva estructura esperada:
+ * id_usuario, email, password, rol, alumnos_ids (sin id_alumno legacy)
  */
 export async function readUsuarios() {
   const range = 'Usuarios!A1:Z100';

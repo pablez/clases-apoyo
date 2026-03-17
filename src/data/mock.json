@@ -85,6 +85,54 @@
       "curso": "Test"
     }
   ],
+  "usuarios": [
+    {
+      "id_usuario": "admin1",
+      "nombre": "Administrador",
+      "email": "admin@clasesapoyo.com",
+      "password": "admin123",
+      "rol": "admin",
+      "telefono": "+51 999999999",
+      "direccion": "Admin Office",
+      "fecha_registro": "2024-01-01"
+    },
+    {
+      "id_usuario": "padre1",
+      "nombre": "Carlos Pérez",
+      "email": "carlos.perez@example.com",
+      "password": "carlos123",
+      "rol": "padre",
+      "telefono": "+51 987654321",
+      "direccion": "Av. Lima 123",
+      "fecha_registro": "2024-01-15",
+      "id_alumno": "1",
+      "alumnos_ids": ["1"]
+    },
+    {
+      "id_usuario": "padre2",
+      "nombre": "Ana López",
+      "email": "ana.lopez@example.com",
+      "password": "ana123",
+      "rol": "padre",
+      "telefono": "+51 912345678",
+      "direccion": "Jr. Cusco 456",
+      "fecha_registro": "2024-01-16",
+      "id_alumno": "2",
+      "alumnos_ids": ["2"]
+    },
+    {
+      "id_usuario": "padre3",
+      "nombre": "María García",
+      "email": "maria.garcia@example.com",
+      "password": "maria123",
+      "rol": "padre",
+      "telefono": "+51 998877665",
+      "direccion": "Av. Principal 789",
+      "fecha_registro": "2024-01-17",
+      "id_alumno": "1",
+      "alumnos_ids": ["1", "2"]
+    }
+  ],
   "asistencias": [
     {
       "id": "101",

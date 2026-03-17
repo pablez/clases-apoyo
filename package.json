@@ -12,7 +12,8 @@
     "test:unit": "vitest run tests/unit",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:open": "playwright test --ui"
+    "test:e2e:open": "playwright test --ui",
+    "debug:asistencias": "node scripts/debug-asistencias.js"
   },
   "keywords": [],
   "author": "",

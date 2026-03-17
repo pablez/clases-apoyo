@@ -8,8 +8,7 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     hasVariable: !!jsonString,
     length: jsonString.length,
-    firstChars: jsonString.substring(0, 100),
-    lastChars: jsonString.substring(Math.max(0, jsonString.length - 100)),
+    preview: jsonString ? `${jsonString.substring(0, 12)}…(${jsonString.length} chars)…${jsonString.substring(Math.max(0, jsonString.length - 12))}` : '',
     validation: null,
     parsed: null
   };
@@ -32,7 +31,8 @@ export async function GET() {
         project_id: parsed.project_id,
         client_email: parsed.client_email,
         hasPrivateKey: !!parsed.private_key,
-        privateKeyLength: parsed.private_key?.length || 0
+        privateKeyLength: parsed.private_key?.length || 0,
+        privateKeyFingerprint: parsed.private_key ? `sha256:${await crypto.subtle.digest('SHA-256', new TextEncoder().encode(parsed.private_key)).then(b=>Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')).then(h=>h.slice(0, 16))}` : null
       };
     } catch (error) {
       result.validation = {
@@ -56,16 +56,16 @@ export async function GET() {
         result.validation.suggestions.push('⚠️ El JSON no termina con }. Verifica que no haya espacios o caracteres al final.');
       }
       
-      // Mostrar el carácter problemático
+      // Mostrar el carácter problemático (sin revelar el secreto completo)
       const pos = parseInt(error.message.match(/position (\d+)/)?.[1] || '0');
       if (pos > 0 && pos < jsonString.length) {
         const start = Math.max(0, pos - 50);
         const end = Math.min(jsonString.length, pos + 50);
         result.validation.problemArea = {
-          before: jsonString.substring(start, pos),
-          problematicChar: jsonString[pos],
+          before: '[redacted]',
+          problematicChar: jsonString[pos] === '\n' ? '\\n' : jsonString[pos],
           charCode: jsonString.charCodeAt(pos),
-          after: jsonString.substring(pos + 1, end)
+          after: '[redacted]'
         };
       }
     }

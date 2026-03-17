@@ -1,0 +1,21 @@
+{
+  "summary": {
+    "totalAlumnos": 6,
+    "usuarios": 4,
+    "proposals": 2
+  },
+  "proposals": [
+    {
+      "rowIndex": 0,
+      "alumnoId": "2",
+      "existingIdUsuario": "",
+      "proposed": "u_1770515733697"
+    },
+    {
+      "rowIndex": 5,
+      "alumnoId": "7",
+      "existingIdUsuario": "",
+      "proposed": "u_1772564761769"
+    }
+  ]
+}

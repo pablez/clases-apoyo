@@ -4,6 +4,7 @@ import AttendanceManager from '../components/AttendanceManager.jsx';
 import AlumnosManager from '../components/AlumnosManager.jsx';
 import MaterialesManager from '../components/MaterialesManager.jsx';
 import CalendarManager from '../components/CalendarManager.jsx';
+import MultiAlumnoManager from '../components/MultiAlumnoManager.jsx';
 
 const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
 ---
@@ -62,6 +63,13 @@ const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
           <span class="hidden sm:inline">📅 Calendario</span>
           <span class="sm:hidden">📅</span>
         </button>
+        <button 
+          class="tab-button px-3 sm:px-4 py-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 text-sm sm:text-base whitespace-nowrap"
+          data-tab="multi-alumno"
+        >
+          <span class="hidden sm:inline">👨‍👩‍👧‍👦 Multi-Alumno</span>
+          <span class="sm:hidden">👨‍👩‍👧‍👦</span>
+        </button>
       </nav>
     </div>
 
@@ -81,6 +89,10 @@ const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
     <div id="tab-calendario" class="tab-content hidden">
       <CalendarManager client:load apiBaseUrl="/api" />
     </div>
+
+    <div id="tab-multi-alumno" class="tab-content hidden">
+      <MultiAlumnoManager client:load apiBaseUrl="/api" />
+    </div>
   </div>
 
   <script define:vars={{ ADMIN_PASSWORD }}>
@@ -97,28 +109,33 @@ const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'admin123';
         try { token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'); } catch(e) { token = null; }
 
         // Try 1: prefer cookie-based auth (credentials only) to avoid stale tokens in storage
-        let resp = await fetch('/api/alumno/asistencias', { credentials: 'include' });
+        let resp = await fetch('/api/auth/verify', { credentials: 'include' });
 
         // If cookie auth failed and we have a stored token, try again with Authorization header
         if ((!resp || !resp.ok) && token) {
-          resp = await fetch('/api/alumno/asistencias', { credentials: 'include', headers: { Authorization: `Bearer ${token}` } });
+          resp = await fetch('/api/auth/verify', { credentials: 'include', headers: { Authorization: `Bearer ${token}` } });
         }
 
         if (!resp || !resp.ok) {
           // not authenticated
+          console.warn('Auth verification failed, redirecting to login');
           window.location.href = '/login';
           return;
         }
 
         const body = await resp.json();
-        const isAdmin = body && body.alumno && body.alumno._usuario && String(body.alumno._usuario.rol || '').toLowerCase() === 'admin';
-        if (!isAdmin) {
+        if (!body.authenticated || !body.isAdmin) {
+          console.warn('User not authenticated or not admin:', body);
           window.location.href = '/login';
           return;
         }
 
         // mark admin flag for Navbar and show panel
-        try { sessionStorage.setItem('admin_auth', 'true'); } catch(e){}
+        try { 
+          sessionStorage.setItem('admin_auth', 'true');
+          sessionStorage.setItem('user_info', JSON.stringify(body.user));
+        } catch(e){}
+        
         authContainer.classList.add('hidden');
         adminPanel.classList.remove('hidden');
       } catch (e) {
