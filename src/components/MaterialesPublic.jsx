@@ -5,11 +5,14 @@ export default function MaterialesPublic({ apiBaseUrl = '/api' }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [selectedMateria, setSelectedMateria] = useState('Todas');
   const [selectedNivel, setSelectedNivel] = useState('Todos');
   const [selectedGrado, setSelectedGrado] = useState('Todos');
   const [query, setQuery] = useState('');
+
+  const itemsPerPage = 9;
 
   useEffect(() => {
     loadMateriales();
@@ -48,6 +51,18 @@ export default function MaterialesPublic({ apiBaseUrl = '/api' }) {
       return inTitle || inDesc || inMateria;
     });
   }, [materials, selectedMateria, selectedNivel, selectedGrado, query]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedMateria, selectedNivel, selectedGrado, query]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedMaterials = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filtered.slice(startIndex, endIndex);
+  }, [filtered, currentPage]);
 
   if (loading) return (
     <div class="py-12">
@@ -140,7 +155,7 @@ export default function MaterialesPublic({ apiBaseUrl = '/api' }) {
                 </select>
 
                 <div class="hidden md:flex items-center">
-                  <span class="text-sm text-gray-600">Resultados: <strong class="text-gray-800">{filtered.length}</strong></span>
+                  <span class="text-sm text-gray-600">Total: <strong class="text-gray-800">{filtered.length}</strong> | Página <strong>{currentPage}</strong>/<strong>{totalPages || 1}</strong></span>
                 </div>
               </div>
             </div>
@@ -153,8 +168,9 @@ export default function MaterialesPublic({ apiBaseUrl = '/api' }) {
             <button onClick={loadMateriales} class="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Recargar</button>
           </div>
         ) : (
-          <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map(m => (
+          <>
+            <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {paginatedMaterials.map(m => (
               <li key={m.id} class="bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden touch-manipulation">
                 <div class="h-36 sm:h-44 bg-gray-100 relative">
                   {m.imagen_url ? (
@@ -189,7 +205,29 @@ export default function MaterialesPublic({ apiBaseUrl = '/api' }) {
                 </div>
               </li>
             ))}
-          </ul>
+            </ul>
+
+            {/* Pagination Controls */}
+            <div class="flex items-center justify-center gap-4 mt-8 pb-8">
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                ← Anterior
+              </button>
+              <span class="text-gray-700 font-medium">
+                Página <strong>{currentPage}</strong> de <strong>{totalPages}</strong>
+              </span>
+              <button 
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage === totalPages}
+                class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Siguiente →
+              </button>
+            </div>
+          </>
         )}
       </div>
     </section>

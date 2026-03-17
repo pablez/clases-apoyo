@@ -8,6 +8,7 @@ export default function MaterialesManager({ apiBaseUrl = '/api', initialMaterial
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [selectedMateria, setSelectedMateria] = useState('Todas');
+  const [currentPage, setCurrentPage] = useState(1);
   const [editingId, setEditingId] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
@@ -22,6 +23,7 @@ export default function MaterialesManager({ apiBaseUrl = '/api', initialMaterial
   });
 
   const materias = ['Todas', 'Matemáticas', 'Física', 'Química', 'Programación','Robotica','Mixto','Computacion e Informatica'];
+  const itemsPerPage = 5;
 
   useEffect(() => {
     loadMateriales();
@@ -156,6 +158,17 @@ export default function MaterialesManager({ apiBaseUrl = '/api', initialMaterial
     ? materiales
     : materiales.filter(m => m.materia === selectedMateria);
 
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedMateria]);
+
+  const totalPages = Math.ceil(filteredMateriales.length / itemsPerPage);
+  const paginatedMateriales = filteredMateriales.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   console.log('🔍 Estado actual:', {
     totalMateriales: materiales.length,
     selectedMateria,
@@ -202,16 +215,16 @@ export default function MaterialesManager({ apiBaseUrl = '/api', initialMaterial
           {dataSource && (
             <div class="text-sm text-gray-500">Fuente: <strong class="ml-1">{dataSource}</strong></div>
           )}
-          <div class="flex gap-2">
+          <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <button
               onClick={startCreating}
-              class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              class="w-full sm:w-auto px-3 sm:px-4 py-2.5 sm:py-2 text-sm sm:text-base bg-green-600 text-white rounded hover:bg-green-700"
             >
               + Nuevo Material
             </button>
             <button
               onClick={loadMateriales}
-              class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              class="w-full sm:w-auto px-3 sm:px-4 py-2.5 sm:py-2 text-sm sm:text-base bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               ↻ Recargar
             </button>
@@ -330,15 +343,15 @@ export default function MaterialesManager({ apiBaseUrl = '/api', initialMaterial
               />
             </div>
           </div>
-          <div class="mt-6 flex gap-2">
+          <div class="mt-6 flex flex-col sm:flex-row gap-2 sm:gap-2">
             <button
               onClick={handleSave}
               disabled={saving}
-              class={`px-6 py-2 rounded font-medium ${
+              class={`px-4 sm:px-6 py-2 sm:py-2 text-sm sm:text-base rounded font-medium ${
                 saving 
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-blue-600 hover:bg-blue-700'
-              } text-white flex items-center gap-2`}
+              } text-white flex items-center gap-2 justify-center sm:justify-start`}
             >
               {saving && (
                 <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -351,7 +364,7 @@ export default function MaterialesManager({ apiBaseUrl = '/api', initialMaterial
             <button
               onClick={resetForm}
               disabled={saving}
-              class="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-50"
+              class="px-4 sm:px-6 py-2 sm:py-2 text-sm sm:text-base bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -375,8 +388,9 @@ export default function MaterialesManager({ apiBaseUrl = '/api', initialMaterial
         )}
 
         {!loading && filteredMateriales.length > 0 && (
+          <>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredMateriales.map(material => (
+            {paginatedMateriales.map(material => (
               <div key={material.id} class="border rounded-lg overflow-hidden hover:shadow-md transition">
                 <div class="relative h-32 bg-gray-200">
                   <img
@@ -420,7 +434,27 @@ export default function MaterialesManager({ apiBaseUrl = '/api', initialMaterial
               </div>
             ))}
           </div>
-        )}
+          {/* Pagination Controls */}
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6 pb-4">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              class="px-4 sm:px-6 py-2 text-sm sm:text-base rounded border border-gray-300 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              ← Anterior
+            </button>
+            <span class="text-gray-700 font-medium text-sm sm:text-base">
+              Página <strong>{currentPage}</strong> de <strong>{totalPages}</strong>
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => p + 1)}
+              disabled={currentPage === totalPages}
+              class="px-4 sm:px-6 py-2 text-sm sm:text-base rounded border border-gray-300 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </>        )}
       </div>
 
       {/* Resumen */}
